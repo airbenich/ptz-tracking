@@ -1,0 +1,45 @@
+# PTZ Tracking - Log Rotation Konfiguration
+# Installieren nach: /etc/logrotate.d/ptz-tracking
+
+/opt/ptz-tracking/logs/*.log {
+    # Rotation täglich
+    daily
+    
+    # Behalte 30 Tage an Logs
+    rotate 30
+    
+    # Logs komprimieren (außer aktuellste)
+    compress
+    delaycompress
+    
+    # Nicht-existierende Logs ignorieren
+    missingok
+    
+    # Leere Logs nicht rotieren
+    notifempty
+    
+    # Logs nicht per Mail versenden
+    nomail
+    
+    # Datum im Dateinamen
+    dateext
+    dateformat -%Y%m%d
+    
+    # Log-Dateien im gleichen Verzeichnis behalten
+    noolddir
+    
+    # Neue Log-Datei mit korrekten Berechtigungen erstellen
+    create 0644 ptztracking ptztracking
+    
+    # Größenlimit: Rotiere auch wenn >100MB (zusätzlich zu täglich)
+    size 100M
+    
+    # Post-Rotation Script
+    postrotate
+        # Optional: Service neu laden um neue Log-Datei zu öffnen
+        # systemctl reload ptz-tracking 2>/dev/null || true
+    endscript
+    
+    # Shared Scripts für alle Logs
+    sharedscripts
+}

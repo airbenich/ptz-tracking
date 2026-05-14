@@ -1,0 +1,31 @@
+# PTZ Tracking - Python Dependencies
+
+# Deep Learning & Computer Vision
+opencv-python>=4.8.0          # OpenCV für Video-Verarbeitung und Display
+ultralytics>=8.0.0            # YOLOv8 für Person Detection
+torch>=2.0.0                  # PyTorch Backend für YOLO
+torchvision>=0.15.0           # Vision-Utilities für PyTorch
+
+# Numerische Berechnungen
+numpy>=1.24.0                 # Array-Operationen
+
+# Bildverarbeitung
+Pillow>=9.5.0                 # PIL für Bildoperationen
+
+# Konfiguration
+PyYAML>=6.0                   # YAML-Konfigurationsdateien
+
+# HTTP-Kommunikation
+requests>=2.31.0              # HTTP-Requests für PTZ-Steuerung
+
+# System-Monitoring
+psutil>=5.9.0                 # System und Prozess-Statistiken
+
+# Video-Input (ffmpeg-python für Python-Wrapper)
+ffmpeg-python>=0.2.0          # ffmpeg Python-Interface (optional)
+
+# Development Dependencies (optional)
+# pytest>=7.4.0               # Testing
+# black>=23.0.0               # Code Formatting
+# flake8>=6.0.0               # Linting
+# mypy>=1.4.0                 # Type Checking

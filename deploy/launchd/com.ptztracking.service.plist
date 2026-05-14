@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service Identifier -->
+    <key>Label</key>
+    <string>com.ptztracking.service</string>
+    
+    <!-- Service Description -->
+    <key>ServiceDescription</key>
+    <string>PTZ Tracking - Real-time Person Tracking</string>
+    
+    <!-- Program to Run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/ptz-tracking/venv/bin/python</string>
+        <string>/usr/local/opt/ptz-tracking/src/main.py</string>
+        <string>--daemon</string>
+        <string>--headless</string>
+    </array>
+    
+    <!-- Working Directory -->
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/ptz-tracking</string>
+    
+    <!-- User to run as (optional, defaults to current user) -->
+    <key>UserName</key>
+    <string>ptztracking</string>
+    <key>GroupName</key>
+    <string>ptztracking</string>
+    
+    <!-- Run at Load -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Keep Alive (Auto-Restart) -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    
+    <!-- Restart Throttle (10 seconds) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/usr/local/opt/ptz-tracking/logs/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/opt/ptz-tracking/logs/stderr.log</string>
+    
+    <!-- Environment Variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/opt/ptz-tracking/venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+    
+    <!-- Process Type -->
+    <key>ProcessType</key>
+    <string>Background</string>
+    
+    <!-- Nice Level (lower = higher priority) -->
+    <key>Nice</key>
+    <integer>-5</integer>
+    
+    <!-- Resource Limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
+    
+    <!-- Exit Timeout -->
+    <key>ExitTimeOut</key>
+    <integer>30</integer>
+    
+    <!-- Disable for now (enable after testing) -->
+    <key>Disabled</key>
+    <false/>
+</dict>
+</plist>
