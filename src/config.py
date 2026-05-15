@@ -100,7 +100,7 @@ SHOW_SKELETON = False
 KEYPOINT_COLOR = (255, 255, 255)  # Weiß
 
 # Keypoint-Radius (Pixel)
-KEYPOINT_RADIUS = 4
+KEYPOINT_RADIUS = 10
 
 # Skeleton-Farbe (BGR)
 SKELETON_COLOR = (255, 255, 255)  # Weiß
@@ -113,7 +113,7 @@ KEYPOINT_CONFIDENCE_THRESHOLD = 0.3
 
 # Transparenz für Skeleton und Keypoints (0.0 - 1.0)
 # 0.0 = komplett transparent, 1.0 = komplett opak
-POSE_OPACITY = 0.5  # 50% Opacity
+POSE_OPACITY = 0.75  # 75% Opacity
 
 # ============================================================================
 # PTZ-Kamera Steuerung (Panasonic AW-HE130)

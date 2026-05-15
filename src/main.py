@@ -333,6 +333,8 @@ def main():
                 logger.info("  n = Nächste Person (loop)")
             if config.ENABLE_PTZ:
                 logger.info("  p = PTZ-Tracking ein/aus")
+                logger.info("  + = Headroom erhöhen (+1%)")
+                logger.info("  - = Headroom verringern (-1%)")
             if config.ENABLE_POSE_ESTIMATION:
                 logger.info("  s = Pose/Skeleton ein/aus")
             logger.info("  f = Vollbild-Toggle")
@@ -417,6 +419,16 @@ def main():
                             config.SHOW_KEYPOINTS = not config.SHOW_KEYPOINTS
                             status_text = "aktiviert" if config.SHOW_SKELETON else "deaktiviert"
                             logger.info(f"Pose/Skeleton {status_text}")
+                    elif key == ord('+') or key == ord('='):
+                        # Headroom erhöhen (nur wenn PTZ aktiviert)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_headroom = ptz_controller.adjust_headroom(0.01)  # +1%
+                            logger.info(f"Headroom erhöht: {new_headroom:.1%}")
+                    elif key == ord('-') or key == ord('_'):
+                        # Headroom verringern (nur wenn PTZ aktiviert)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_headroom = ptz_controller.adjust_headroom(-0.01)  # -1%
+                            logger.info(f"Headroom verringert: {new_headroom:.1%}")
                     elif key == ord('f'):
                         # Vollbild-Toggle
                         import cv2
@@ -459,6 +471,16 @@ def main():
                             config.SHOW_KEYPOINTS = not config.SHOW_KEYPOINTS
                             status_text = "aktiviert" if config.SHOW_SKELETON else "deaktiviert"
                             logger.info(f"Pose/Skeleton {status_text}")
+                    elif key == ord('+') or key == ord('='):
+                        # Headroom erhöhen (auch im Pause-Modus)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_headroom = ptz_controller.adjust_headroom(0.01)
+                            logger.info(f"Headroom erhöht: {new_headroom:.1%}")
+                    elif key == ord('-') or key == ord('_'):
+                        # Headroom verringern (auch im Pause-Modus)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_headroom = ptz_controller.adjust_headroom(-0.01)
+                            logger.info(f"Headroom verringert: {new_headroom:.1%}")
     
     except KeyboardInterrupt:
         logger.info("\nAnwendung durch Benutzer beendet")

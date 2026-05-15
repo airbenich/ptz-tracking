@@ -232,11 +232,13 @@ class Visualizer:
                 # Aktive Person: Farbe abhängig von PTZ-Tracking Status
                 ptz_enabled = ptz_controller is not None and ptz_controller.is_enabled()
                 color = (0, 255, 255) if ptz_enabled else (255, 255, 255)  # Gelb wenn ON, Weiß wenn OFF
-                thickness = 3
+                thickness = 10 if ptz_enabled else 3
+                corner_length = 60 if ptz_enabled else 20
             else:
                 # Inaktive Personen: Grau
                 color = config.INACTIVE_PERSON_COLOR
                 thickness = 2
+                corner_length = 20
             
             # Kopf-BBox zeichnen (basierend auf Gesichts-Features)
             head_bbox = detection.get_head_bbox(confidence_threshold=config.KEYPOINT_CONFIDENCE_THRESHOLD)
@@ -248,7 +250,8 @@ class Visualizer:
                     head_bbox[0], head_bbox[1],
                     head_bbox[2], head_bbox[3],
                     color,
-                    thickness
+                    thickness,
+                    corner_length
                 )
                 
                 # BBox-Zentrum für Label-Positionierung
@@ -261,7 +264,8 @@ class Visualizer:
                     detection.x1, detection.y1,
                     detection.x2, detection.y2,
                     color,
-                    thickness
+                    thickness,
+                    corner_length
                 )
                 
                 # BBox-Zentrum für Label-Positionierung

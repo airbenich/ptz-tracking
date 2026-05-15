@@ -231,11 +231,69 @@ class PTZRestHandler(BaseHTTPRequestHandler):
             })
             return
         
+        # ====================================================================
+        # Display-Endpoints (Visualisierung)
+        # ====================================================================
+        
+        # GET /display/pose/toggle - Pose/Skeleton ein/aus
+        elif path == '/display/pose/toggle':
+            if not config.ENABLE_POSE_ESTIMATION:
+                self._send_json_response(400, {
+                    "error": "Pose-Estimation ist deaktiviert",
+                    "message": "ENABLE_POSE_ESTIMATION muss True sein"
+                })
+                return
+            
+            # Toggle beide gleichzeitig
+            config.SHOW_SKELETON = not config.SHOW_SKELETON
+            config.SHOW_KEYPOINTS = not config.SHOW_KEYPOINTS
+            
+            enabled = config.SHOW_SKELETON
+            self._send_json_response(200, {
+                "success": True,
+                "message": f"Pose/Skeleton {'aktiviert' if enabled else 'deaktiviert'}",
+                "show_skeleton": config.SHOW_SKELETON,
+                "show_keypoints": config.SHOW_KEYPOINTS
+            })
+            return
+        
+        # GET /display/pose/enable - Pose/Skeleton aktivieren
+        elif path == '/display/pose/enable':
+            if not config.ENABLE_POSE_ESTIMATION:
+                self._send_json_response(400, {
+                    "error": "Pose-Estimation ist deaktiviert"
+                })
+                return
+            
+            config.SHOW_SKELETON = True
+            config.SHOW_KEYPOINTS = True
+            
+            self._send_json_response(200, {
+                "success": True,
+                "message": "Pose/Skeleton aktiviert",
+                "show_skeleton": True,
+                "show_keypoints": True
+            })
+            return
+        
+        # GET /display/pose/disable - Pose/Skeleton deaktivieren
+        elif path == '/display/pose/disable':
+            config.SHOW_SKELETON = False
+            config.SHOW_KEYPOINTS = False
+            
+            self._send_json_response(200, {
+                "success": True,
+                "message": "Pose/Skeleton deaktiviert",
+                "show_skeleton": False,
+                "show_keypoints": False
+            })
+            return
+        
         # GET / - Root (API-Info)
         elif path == '/' or path == '':
             self._send_json_response(200, {
                 "name": "PTZ Tracking REST API",
-                "version": "1.1",
+                "version": "1.2",
                 "endpoints": {
                     "ptz": {
                         "/ptz/enable": "PTZ-Steuerung aktivieren",
@@ -251,6 +309,11 @@ class PTZRestHandler(BaseHTTPRequestHandler):
                         "/tracking/next": "Zur nächsten Person wechseln (loop)",
                         "/tracking/select?id=X": "Spezifische Person auswählen",
                         "/tracking/status": "Status aller getracken Personen"
+                    },
+                    "display": {
+                        "/display/pose/toggle": "Pose/Skeleton ein/aus",
+                        "/display/pose/enable": "Pose/Skeleton aktivieren",
+                        "/display/pose/disable": "Pose/Skeleton deaktivieren"
                     }
                 }
             })
