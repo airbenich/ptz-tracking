@@ -5,8 +5,9 @@ Steuert Pan/Tilt basierend auf Person-Tracking
 
 import requests
 import time
+import queue
 from typing import Optional, Tuple
-from threading import Lock
+from threading import Lock, Thread
 
 from src import config
 from src.tracking.person_detector import Detection
@@ -66,13 +67,22 @@ class PTZController:
         # Companion Client für Custom Variables
         self.companion = get_companion_client()
         
-        logger.info(f"PTZ-Controller initialisiert (Speed-basiert)")
+        # Asynchrone Command-Queue (non-blocking PTZ-Befehle)
+        self.command_queue = queue.Queue(maxsize=10)  # Max 10 pending commands
+        self._shutdown = False
+        
+        # Worker-Thread für asynchrone HTTP-Requests
+        self.worker_thread = Thread(target=self._command_worker, daemon=True, name="PTZ-Worker")
+        self.worker_thread.start()
+        
+        logger.info(f"PTZ-Controller initialisiert (Speed-basiert, Async)")
         logger.info(f"  Kamera: {self.camera_ip}:{self.camera_port}")
         logger.info(f"  Enabled: {self.enabled}")
         logger.info(f"  Target Position: X={config.PTZ_TARGET_X} (center), Headroom={config.PTZ_HEADROOM}")
         logger.info(f"  Speed Range: {config.PTZ_MIN_SPEED}-{config.PTZ_MAX_SPEED}")
         logger.info(f"  Speed Smoothing: {config.PTZ_SPEED_SMOOTHING}")
         logger.info(f"  Speed Ramp: {config.PTZ_SPEED_RAMP}")
+        logger.info(f"  Async Queue: Worker-Thread gestartet")
         
         # Initial Companion-Variablen setzen
         self._update_companion_status()
@@ -282,7 +292,68 @@ class PTZController:
     
     def _send_speed_command(self, pan_speed: int, tilt_speed: int) -> bool:
         """
-        Sendet PTZ-Speed-Befehl an Kamera
+        Sendet PTZ-Speed-Befehl asynchron an Kamera (non-blocking)
+        
+        Args:
+            pan_speed: Pan-Geschwindigkeit (01-99, 50=Stop)
+            tilt_speed: Tilt-Geschwindigkeit (01-99, 50=Stop)
+        
+        Returns:
+            True wenn Befehl in Queue eingefügt wurde
+        """
+        try:
+            # Befehl in Queue schreiben (non-blocking)
+            # Älteste Befehle werden verworfen falls Queue voll (neueste Daten wichtiger)
+            try:
+                self.command_queue.put_nowait((pan_speed, tilt_speed))
+                logger.debug(f"PTZ Command queued → Pan: {pan_speed}, Tilt: {tilt_speed}")
+                return True
+            except queue.Full:
+                # Queue voll → ältesten Befehl verwerfen, neuen einfügen
+                try:
+                    self.command_queue.get_nowait()  # Ältesten entfernen
+                    self.command_queue.put_nowait((pan_speed, tilt_speed))
+                    logger.debug(f"PTZ Command queued (dropped oldest) → Pan: {pan_speed}, Tilt: {tilt_speed}")
+                    return True
+                except:
+                    logger.warning("PTZ Command Queue: Fehler beim Verwerfen")
+                    return False
+        except Exception as e:
+            logger.error(f"PTZ Queue Fehler: {e}")
+            return False
+    
+    def _command_worker(self):
+        """
+        Worker-Thread: Verarbeitet PTZ-Befehle aus Queue asynchron
+        
+        Läuft in separatem Thread und sendet HTTP-Requests ohne Main-Thread zu blockieren
+        """
+        logger.info("PTZ Worker-Thread gestartet")
+        
+        while not self._shutdown:
+            try:
+                # Warte auf nächsten Befehl (mit Timeout für Shutdown-Check)
+                try:
+                    pan_speed, tilt_speed = self.command_queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue  # Kein Befehl → weiter warten
+                
+                # Befehl ausführen
+                self._execute_speed_command(pan_speed, tilt_speed)
+                
+                # Queue-Task als erledigt markieren
+                self.command_queue.task_done()
+                
+            except Exception as e:
+                logger.error(f"PTZ Worker-Thread Fehler: {e}")
+        
+        logger.info("PTZ Worker-Thread beendet")
+    
+    def _execute_speed_command(self, pan_speed: int, tilt_speed: int) -> bool:
+        """
+        Führt PTZ-Speed-Befehl tatsächlich aus (HTTP-Request)
+        
+        Wird vom Worker-Thread aufgerufen (nicht direkt verwenden!)
         
         Args:
             pan_speed: Pan-Geschwindigkeit (01-99, 50=Stop)
@@ -311,7 +382,7 @@ class PTZController:
             url = f"{self.base_url}/cgi-bin/aw_ptz?cmd={cmd}&res=1"
             
             # Log Command URL
-            logger.debug(f"PTZ Command → {url}")
+            logger.debug(f"PTZ HTTP → {url}")
             
             # HTTP-Request senden (mit Timeout)
             response = requests.get(url, timeout=0.5)
@@ -444,3 +515,27 @@ class PTZController:
         
         headroom_percent = int(config.PTZ_HEADROOM * 100)
         self.companion.set_variable("ptz_headroom", headroom_percent)
+    
+    def shutdown(self):
+        """
+        Beendet PTZ-Controller sauber
+        
+        Stoppt Worker-Thread und sendet Stop-Command
+        """
+        logger.info("PTZ-Controller wird heruntergefahren...")
+        
+        # Stop-Command senden
+        self._send_stop_command()
+        
+        # Worker-Thread beenden
+        self._shutdown = True
+        
+        # Warten auf Thread-Ende (max 2 Sekunden)
+        if self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=2.0)
+            if self.worker_thread.is_alive():
+                logger.warning("PTZ Worker-Thread konnte nicht sauber beendet werden")
+            else:
+                logger.info("PTZ Worker-Thread beendet")
+        
+        logger.info("PTZ-Controller heruntergefahren")

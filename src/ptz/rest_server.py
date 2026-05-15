@@ -20,6 +20,9 @@ class PTZRestHandler(BaseHTTPRequestHandler):
     # Referenz zum PTZ-Controller (wird von PTZRestServer gesetzt)
     ptz_controller = None
     
+    # Referenz zum Multi-Person-Tracker (wird von PTZRestServer gesetzt)
+    multi_person_tracker = None
+    
     def log_message(self, format, *args):
         """Überschreibt Standard-Logging (nutzt Python-Logger)"""
         logger.debug(f"REST: {format % args}")
@@ -146,20 +149,109 @@ class PTZRestHandler(BaseHTTPRequestHandler):
                 })
             return
         
+        # ====================================================================
+        # Tracking-Endpoints (Multi-Person)
+        # ====================================================================
+        
+        # GET /tracking/next - Zur nächsten Person wechseln
+        elif path == '/tracking/next':
+            if self.multi_person_tracker is None:
+                self._send_json_response(500, {
+                    "error": "Multi-Person-Tracker nicht verfügbar"
+                })
+                return
+            
+            new_track_id = self.multi_person_tracker.select_next_person()
+            
+            if new_track_id is None:
+                self._send_json_response(200, {
+                    "success": False,
+                    "message": "Keine Personen getrackt",
+                    "active_track_id": None
+                })
+            else:
+                self._send_json_response(200, {
+                    "success": True,
+                    "message": f"Gewechselt zu Person {new_track_id}",
+                    "active_track_id": new_track_id
+                })
+            return
+        
+        # GET /tracking/select?id=X - Spezifische Person auswählen
+        elif path == '/tracking/select':
+            if self.multi_person_tracker is None:
+                self._send_json_response(500, {
+                    "error": "Multi-Person-Tracker nicht verfügbar"
+                })
+                return
+            
+            # Query-Parameter auslesen
+            if 'id' not in query_params:
+                self._send_json_response(400, {
+                    "error": "Parameter 'id' fehlt",
+                    "usage": "/tracking/select?id=1"
+                })
+                return
+            
+            try:
+                track_id = int(query_params['id'][0])
+                success = self.multi_person_tracker.select_person_by_id(track_id)
+                
+                if success:
+                    self._send_json_response(200, {
+                        "success": True,
+                        "message": f"Person {track_id} ausgewählt",
+                        "active_track_id": track_id
+                    })
+                else:
+                    self._send_json_response(404, {
+                        "success": False,
+                        "error": f"Person mit ID {track_id} nicht gefunden",
+                        "active_track_id": self.multi_person_tracker.active_track_id
+                    })
+            except ValueError:
+                self._send_json_response(400, {
+                    "error": "Ungültiger Wert für 'id'",
+                    "usage": "/tracking/select?id=1"
+                })
+            return
+        
+        # GET /tracking/status - Status aller getracken Personen
+        elif path == '/tracking/status':
+            if self.multi_person_tracker is None:
+                self._send_json_response(500, {
+                    "error": "Multi-Person-Tracker nicht verfügbar"
+                })
+                return
+            
+            status = self.multi_person_tracker.get_status()
+            self._send_json_response(200, {
+                "success": True,
+                "tracking": status
+            })
+            return
+        
         # GET / - Root (API-Info)
         elif path == '/' or path == '':
             self._send_json_response(200, {
                 "name": "PTZ Tracking REST API",
-                "version": "1.0",
+                "version": "1.1",
                 "endpoints": {
-                    "/ptz/enable": "PTZ-Steuerung aktivieren",
-                    "/ptz/disable": "PTZ-Steuerung deaktivieren",
-                    "/ptz/toggle": "PTZ-Steuerung umschalten",
-                    "/ptz/status": "PTZ-Status abfragen",
-                    "/ptz/home": "Home-Position anfahren",
-                    "/ptz/headroom/increase": "Headroom erhöhen (+1%)",
-                    "/ptz/headroom/decrease": "Headroom verringern (-1%)",
-                    "/ptz/headroom/set?value=X": "Headroom setzen (0.0-0.5)"
+                    "ptz": {
+                        "/ptz/enable": "PTZ-Steuerung aktivieren",
+                        "/ptz/disable": "PTZ-Steuerung deaktivieren",
+                        "/ptz/toggle": "PTZ-Steuerung umschalten",
+                        "/ptz/status": "PTZ-Status abfragen",
+                        "/ptz/home": "Home-Position anfahren",
+                        "/ptz/headroom/increase": "Headroom erhöhen (+1%)",
+                        "/ptz/headroom/decrease": "Headroom verringern (-1%)",
+                        "/ptz/headroom/set?value=X": "Headroom setzen (0.0-0.5)"
+                    },
+                    "tracking": {
+                        "/tracking/next": "Zur nächsten Person wechseln (loop)",
+                        "/tracking/select?id=X": "Spezifische Person auswählen",
+                        "/tracking/status": "Status aller getracken Personen"
+                    }
                 }
             })
             return
@@ -179,21 +271,30 @@ class PTZRestServer:
     Läuft in separatem Thread
     """
     
-    def __init__(self, ptz_controller, host: str = None, port: int = None):
+    def __init__(
+        self,
+        ptz_controller,
+        multi_person_tracker=None,
+        host: str = None,
+        port: int = None
+    ):
         """
         Initialisiert REST-Server
         
         Args:
             ptz_controller: PTZController-Instanz
+            multi_person_tracker: MultiPersonTracker-Instanz (optional)
             host: Host-Adresse (default: config.PTZ_REST_HOST)
             port: Port (default: config.PTZ_REST_PORT)
         """
         self.ptz_controller = ptz_controller
+        self.multi_person_tracker = multi_person_tracker
         self.host = host or config.PTZ_REST_HOST
         self.port = port or config.PTZ_REST_PORT
         
-        # PTZ-Controller an Handler übergeben
+        # PTZ-Controller und Tracker an Handler übergeben
         PTZRestHandler.ptz_controller = ptz_controller
+        PTZRestHandler.multi_person_tracker = multi_person_tracker
         
         # HTTP-Server
         self.httpd = None
@@ -223,14 +324,21 @@ class PTZRestServer:
             
             self.running = True
             logger.info(f"✓ PTZ REST-Server gestartet auf {self.host}:{self.port}")
-            logger.info(f"  Endpoints:")
+            logger.info(f"  PTZ-Endpoints:")
             logger.info(f"    http://{self.host}:{self.port}/ptz/enable")
             logger.info(f"    http://{self.host}:{self.port}/ptz/disable")
             logger.info(f"    http://{self.host}:{self.port}/ptz/toggle")
             logger.info(f"    http://{self.host}:{self.port}/ptz/status")
+            logger.info(f"    http://{self.host}:{self.port}/ptz/home")
             logger.info(f"    http://{self.host}:{self.port}/ptz/headroom/increase")
             logger.info(f"    http://{self.host}:{self.port}/ptz/headroom/decrease")
             logger.info(f"    http://{self.host}:{self.port}/ptz/headroom/set?value=X")
+            
+            if self.multi_person_tracker:
+                logger.info(f"  Tracking-Endpoints:")
+                logger.info(f"    http://{self.host}:{self.port}/tracking/next")
+                logger.info(f"    http://{self.host}:{self.port}/tracking/select?id=X")
+                logger.info(f"    http://{self.host}:{self.port}/tracking/status")
             
         except OSError as e:
             logger.error(f"Fehler beim Starten des REST-Servers: {e}")

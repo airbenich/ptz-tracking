@@ -143,6 +143,59 @@ class Detection:
         
         return None
     
+    def get_head_bbox(self, confidence_threshold: float = 0.3) -> Optional[Tuple[int, int, int, int]]:
+        """
+        Berechnet Bounding Box für den Kopf basierend auf Gesichts-Features
+        
+        - Oberkante: BBox-Oberkante (y1) der Person
+        - Seitlich: Berechnet aus Gesichts-Features (Augen, Ohren)
+        - Unterkante: Gleiche Höhe wie zur Oberkante
+        
+        Args:
+            confidence_threshold: Minimale Konfidenz für Keypoints
+        
+        Returns:
+            (x1, y1, x2, y2) Kopf-BBox oder None wenn keine Features
+        """
+        if not self.has_pose() or len(self.keypoints) < 5:
+            return None
+        
+        # Gesichts-Keypoints: 0=Nose, 1=Left Eye, 2=Right Eye, 3=Left Ear, 4=Right Ear
+        face_keypoints = self.keypoints[0:5]
+        
+        # Filtere sichtbare Keypoints
+        visible = []
+        for i, kpt in enumerate(face_keypoints):
+            if kpt[2] >= confidence_threshold:
+                visible.append((i, kpt[0], kpt[1]))  # (index, x, y)
+        
+        if len(visible) < 2:
+            return None
+        
+        # Berechne horizontale Ausdehnung aus sichtbaren Features
+        xs = [kpt[1] for kpt in visible]
+        min_x = min(xs)
+        max_x = max(xs)
+        
+        # Breite mit Padding (20% auf jeder Seite)
+        width = max_x - min_x
+        padding = width * 0.2
+        
+        head_x1 = int(min_x - padding)
+        head_x2 = int(max_x + padding)
+        head_width = head_x2 - head_x1
+        
+        # Oberkante: BBox-Oberkante der Person
+        head_y1 = self.y1
+        
+        # Höhe: Gleiche Höhe wie die Breite (quadratisch)
+        # Alternativ: Proportional zur Breite für realistischere Kopf-Proportionen
+        head_height = int(head_width * 1.2)  # Kopf ist typischerweise etwas höher als breit
+        
+        head_y2 = head_y1 + head_height
+        
+        return (head_x1, head_y1, head_x2, head_y2)
+    
     def __repr__(self) -> str:
         pose_info = f", pose={len(self.keypoints) if self.has_pose() else 0} kpts" if self.has_pose() else ""
         return f"Detection(bbox={self.bbox}, conf={self.confidence:.2f}{pose_info})"

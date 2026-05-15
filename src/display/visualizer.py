@@ -41,6 +41,44 @@ class Visualizer:
     Visualisiert Tracking-Daten mit OpenCV
     """
     
+    @staticmethod
+    def draw_bbox_corners(
+        frame: np.ndarray,
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        color: tuple,
+        thickness: int = 2,
+        corner_length: int = 20
+    ) -> None:
+        """
+        Zeichnet nur die 4 Ecken einer BBox als rechte Winkel
+        
+        Args:
+            frame: Frame zum Zeichnen
+            x1, y1: Obere linke Ecke
+            x2, y2: Untere rechte Ecke
+            color: Farbe der Ecken
+            thickness: Linienstärke
+            corner_length: Länge der Ecken-Linien in Pixel
+        """
+        # Oben links
+        cv2.line(frame, (x1, y1), (x1 + corner_length, y1), color, thickness)
+        cv2.line(frame, (x1, y1), (x1, y1 + corner_length), color, thickness)
+        
+        # Oben rechts
+        cv2.line(frame, (x2, y1), (x2 - corner_length, y1), color, thickness)
+        cv2.line(frame, (x2, y1), (x2, y1 + corner_length), color, thickness)
+        
+        # Unten links
+        cv2.line(frame, (x1, y2), (x1 + corner_length, y2), color, thickness)
+        cv2.line(frame, (x1, y2), (x1, y2 - corner_length), color, thickness)
+        
+        # Unten rechts
+        cv2.line(frame, (x2, y2), (x2 - corner_length, y2), color, thickness)
+        cv2.line(frame, (x2, y2), (x2, y2 - corner_length), color, thickness)
+    
     def __init__(
         self,
         window_name: str = None,
@@ -150,6 +188,139 @@ class Visualizer:
         
         return frame
     
+    def draw_multi_person_tracking(
+        self,
+        frame: np.ndarray,
+        multi_person_tracker,
+        ptz_controller = None
+    ) -> np.ndarray:
+        """
+        Zeichnet alle getracken Personen mit IDs
+        
+        Args:
+            frame: Input-Frame
+            multi_person_tracker: MultiPersonTracker-Instanz
+            ptz_controller: PTZ-Controller für Status-basierte Farben
+        
+        Returns:
+            Frame mit allen getracken Personen
+        """
+        if multi_person_tracker is None:
+            return frame
+        
+        if not config.SHOW_ALL_TRACKED_PERSONS:
+            return frame
+        
+        # Alle Tracks holen
+        tracks = multi_person_tracker.get_all_tracks()
+        active_track_id = multi_person_tracker.active_track_id
+        
+        for track in tracks:
+            is_active = (track.track_id == active_track_id)
+            
+            # Für aktive Person: Geglättete Detection verwenden
+            if is_active:
+                detection = multi_person_tracker.get_active_detection()
+                if detection is None:
+                    detection = track.detection
+            else:
+                # Inaktive Personen: Ungeglättete Detection
+                detection = track.detection
+            
+            # Farbe und Thickness basierend auf Status
+            if is_active:
+                # Aktive Person: Farbe abhängig von PTZ-Tracking Status
+                ptz_enabled = ptz_controller is not None and ptz_controller.is_enabled()
+                color = (0, 255, 255) if ptz_enabled else (255, 255, 255)  # Gelb wenn ON, Weiß wenn OFF
+                thickness = 3
+            else:
+                # Inaktive Personen: Grau
+                color = config.INACTIVE_PERSON_COLOR
+                thickness = 2
+            
+            # Kopf-BBox zeichnen (basierend auf Gesichts-Features)
+            head_bbox = detection.get_head_bbox(confidence_threshold=config.KEYPOINT_CONFIDENCE_THRESHOLD)
+            
+            if head_bbox is not None:
+                # Kopf-BBox Ecken zeichnen
+                self.draw_bbox_corners(
+                    frame,
+                    head_bbox[0], head_bbox[1],
+                    head_bbox[2], head_bbox[3],
+                    color,
+                    thickness
+                )
+                
+                # BBox-Zentrum für Label-Positionierung
+                bbox_center_x = (head_bbox[0] + head_bbox[2]) // 2
+                label_y = head_bbox[1]
+            else:
+                # Fallback: Ganzer Körper wenn keine Keypoints
+                self.draw_bbox_corners(
+                    frame,
+                    detection.x1, detection.y1,
+                    detection.x2, detection.y2,
+                    color,
+                    thickness
+                )
+                
+                # BBox-Zentrum für Label-Positionierung
+                bbox_center_x = (detection.x1 + detection.x2) // 2
+                label_y = detection.y1
+            
+            # Label mit Track-ID
+            label = f"PERSON: {track.track_id}"
+            if is_active and not ptz_enabled:
+                label += " SELECTED"
+            if is_active and ptz_enabled:
+                label += " TRACKING"
+            
+            label_size, _ = cv2.getTextSize(
+                label,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                2
+            )
+            
+            # Label horizontal zentrieren über BBox
+            label_x = bbox_center_x - (label_size[0] + 10) // 2
+            # Sicherstellen dass Label nicht über Bildrand hinausgeht
+            label_x = max(0, label_x)
+            label_x = min(label_x, frame.shape[1] - label_size[0] - 10)
+            
+            # Label-Farben basierend auf PTZ-Tracking Status (nur für aktive Person)
+            if is_active:
+                # Aktive Person: Farbe abhängig von PTZ-Tracking Status
+                ptz_enabled = ptz_controller is not None and ptz_controller.is_enabled()
+                label_bg_color = (0, 255, 255) if ptz_enabled else (255, 255, 255)  # Gelb wenn ON, Weiß wenn OFF
+                label_text_color = (0, 0, 0)  # Immer Schwarz
+            else:
+                # Inaktive Personen: Grau/Weiß
+                label_bg_color = color
+                label_text_color = (255, 255, 255)
+            
+            # Label-Hintergrund
+            cv2.rectangle(
+                frame,
+                (label_x, label_y - label_size[1] - 10),
+                (label_x + label_size[0] + 10, label_y),
+                label_bg_color,
+                -1
+            )
+            
+            # Label-Text
+            cv2.putText(
+                frame,
+                label,
+                (label_x + 5, label_y - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                label_text_color,
+                2
+            )
+        
+        return frame
+    
     def draw_pose(
         self,
         frame: np.ndarray,
@@ -183,6 +354,11 @@ class Visualizer:
                 if start_idx >= len(keypoints) or end_idx >= len(keypoints):
                     continue
                 
+                # Face-Features überspringen wenn deaktiviert (Keypoints 0-4: Nase, Augen, Ohren)
+                if not config.SHOW_FACE_KEYPOINTS:
+                    if start_idx <= 4 or end_idx <= 4:
+                        continue
+                
                 start_kpt = keypoints[start_idx]
                 end_kpt = keypoints[end_idx]
                 
@@ -207,8 +383,12 @@ class Visualizer:
         
         # Keypoints zeichnen (über Skeleton damit sie sichtbar bleiben)
         if config.SHOW_KEYPOINTS:
-            for kpt in keypoints:
+            for idx, kpt in enumerate(keypoints):
                 x, y, conf = kpt
+                
+                # Face-Features überspringen wenn deaktiviert (Keypoints 0-4: Nase, Augen, Ohren)
+                if not config.SHOW_FACE_KEYPOINTS and idx <= 4:
+                    continue
                 
                 # Nur wenn Konfidenz hoch genug
                 if conf < config.KEYPOINT_CONFIDENCE_THRESHOLD:
@@ -321,17 +501,26 @@ class Visualizer:
                 config.TEXT_THICKNESS
             )
         
-        # PTZ-Status (prominent anzeigen)
+        # PTZ-Status (prominent anzeigen - rechts oben)
         if ptz_controller is not None:
             ptz_enabled = ptz_controller.is_enabled()
             ptz_text = "Tracking: ON" if ptz_enabled else "Tracking: OFF"
             ptz_color = (0, 255, 255) if ptz_enabled else (255, 255, 255)  # Gelb/Rot
             
+            # Text-Größe berechnen für rechts-Positionierung
+            text_size, _ = cv2.getTextSize(
+                ptz_text,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                config.TEXT_SCALE * 1.2,
+                config.TEXT_THICKNESS + 1
+            )
+            text_x = frame.shape[1] - text_size[0] - 20
+            
             # Größerer Text für PTZ-Status
             cv2.putText(
                 frame,
                 ptz_text,
-                (20, y_offset),
+                (text_x, y_offset),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 config.TEXT_SCALE * 1.2,  # Größer
                 ptz_color,
@@ -392,44 +581,45 @@ class Visualizer:
         deadzone_bottom = min(frame_height, target_y + deadzone_pixels)
         
         # Deadzone als semi-transparenter Bereich (optional)
-        overlay = frame.copy()
-        cv2.rectangle(
-            overlay,
-            (0, deadzone_top),
-            (frame_width, deadzone_bottom),
-            (255, 255, 255),  # Weiß
-            -1
-        )
-        # Mit Transparenz überblenden
-        cv2.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
-        
-        # Soll-Position: horizontale Linie (gestrichelt)
-        line_color = (255, 255, 255)  # Weiß
-        dash_length = 20
-        gap_length = 10
-        
-        x = 0
-        while x < frame_width:
-            x_end = min(x + dash_length, frame_width)
-            cv2.line(
-                frame,
-                (x, target_y),
-                (x_end, target_y),
-                line_color,
-                2,
-                lineType=cv2.LINE_AA
+        if config.SHOW_HEADROOM_LINE_DEADZONE:
+            overlay = frame.copy()
+            cv2.rectangle(
+                overlay,
+                (0, deadzone_top),
+                (frame_width, deadzone_bottom),
+                (255, 255, 255),  # Weiß
+                -1
             )
-            x += dash_length + gap_length
+            # Mit Transparenz überblenden
+            cv2.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
         
-        # Headroom-Wert anzeigen (rechts oben)
+        # Farbe für Headroom-Elemente
+        line_color = (255, 255, 255)  # Weiß
+        
+        # Soll-Position: horizontale Linie (gestrichelt) - nur wenn aktiviert
+        if config.SHOW_HEADROOM_LINE:
+            overlay = frame.copy()
+            dash_length = 4
+            gap_length = 15
+
+            padding: int = int(frame_width/4)  # Abstand von der Linie zu den Enden
+            
+            x = 0 + padding
+            while x < frame_width - padding:
+                x_end = min(x + dash_length, frame_width - padding)
+                cv2.line(
+                    overlay,
+                    (x, target_y),
+                    (x_end, target_y),
+                    line_color,
+                    4,
+                    lineType=cv2.LINE_AA
+                )
+                x += dash_length + gap_length
+            cv2.addWeighted(overlay, 0.8, frame, 0.2, 0, frame)
+        # Headroom-Wert anzeigen (links oben)
         headroom_text = f"Headroom: {int(config.PTZ_HEADROOM * 100)}%"
-        text_size, _ = cv2.getTextSize(
-            headroom_text,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            config.TEXT_SCALE * 1.2,
-            2
-        )
-        text_x = frame_width - text_size[0] - 20
+        text_x = 20
         text_y = 60
         
         # Text
@@ -445,7 +635,7 @@ class Visualizer:
         )
         
         # Wenn Detection vorhanden: aktuelle BBox-Oberkante markieren
-        if detection is not None:
+        if detection is not None and config.SHOW_HEADROOM_LINE_ON_PERSON:
             bbox_top_y = detection.y1
             
             # Aktuelle Position als durchgezogene Linie (nur in Bildmitte)
@@ -505,15 +695,17 @@ class Visualizer:
         self,
         frame: np.ndarray,
         detection: Optional[Detection] = None,
-        ptz_controller = None
+        ptz_controller = None,
+        multi_person_tracker = None
     ) -> int:
         """
         Zeigt Frame mit Visualisierung an
         
         Args:
             frame: Input-Frame
-            detection: Optional Detection zum Zeichnen
+            detection: Optional Detection zum Zeichnen (aktive Person)
             ptz_controller: PTZ-Controller für Status-Anzeige
+            multi_person_tracker: MultiPersonTracker für alle Personen
         
         Returns:
             Gedrückte Taste (oder -1)
@@ -528,16 +720,20 @@ class Visualizer:
         # Frame kopieren für Visualisierung
         display_frame = frame.copy()
         
-        # Detection zeichnen
-        display_frame = self.draw_detection(display_frame, detection)
-        
-        # Pose zeichnen (Keypoints und Skeleton)
-        display_frame = self.draw_pose(display_frame, detection)
-        
-        # Headroom-Guide zeichnen
+        # 1. Headroom-Guide zeichnen (Hintergrund - Deadzone + Linie)
         display_frame = self.draw_headroom_guide(display_frame, detection, ptz_controller)
         
-        # Info-Overlay
+        # 2. Multi-Person-Tracking zeichnen (alle Personen mit BBoxen)
+        if multi_person_tracker is not None:
+            display_frame = self.draw_multi_person_tracking(display_frame, multi_person_tracker, ptz_controller)
+        else:
+            # Fallback: nur aktive Detection zeichnen
+            display_frame = self.draw_detection(display_frame, detection)
+        
+        # 3. Pose zeichnen (Keypoints und Skeleton) - nur für aktive Person
+        display_frame = self.draw_pose(display_frame, detection)
+        
+        # 4. Info-Overlay (Vordergrund)
         display_frame = self.draw_info(display_frame, detection, ptz_controller)
         
         # Resize für Display

@@ -37,6 +37,7 @@ class PersonTracker:
         
         self.current_detection: Optional[Detection] = None
         self.smoothed_bbox: Optional[tuple] = None
+        self.smoothed_keypoints: Optional[np.ndarray] = None
         self.frames_without_detection = 0
         
         logger.info(f"Person Tracker initialisiert")
@@ -115,33 +116,55 @@ class PersonTracker:
     
     def _apply_smoothing(self, detection: Detection) -> Detection:
         """
-        Wendet Smoothing auf Bounding Box an
+        Wendet Smoothing auf Bounding Box und Keypoints an
         
         Args:
             detection: Neue Detection
         
         Returns:
-            Detection mit geglätteter Bounding Box
+            Detection mit geglätteter Bounding Box und Keypoints
         """
+        # BBox Smoothing
         if not self.smoothed_bbox:
             self.smoothed_bbox = detection.bbox
+            self.smoothed_keypoints = detection.keypoints.copy() if detection.has_pose() else None
             return detection
         
-        # Exponential Smoothing
+        # Exponential Smoothing für BBox
         alpha = 1 - self.smoothing_factor
         
-        smoothed = tuple(
+        smoothed_bbox = tuple(
             int(alpha * new + (1 - alpha) * old)
             for new, old in zip(detection.bbox, self.smoothed_bbox)
         )
         
-        self.smoothed_bbox = smoothed
+        self.smoothed_bbox = smoothed_bbox
+        
+        # Keypoint Smoothing
+        smoothed_keypoints = None
+        if detection.has_pose() and detection.keypoints is not None:
+            if self.smoothed_keypoints is not None and len(self.smoothed_keypoints) == len(detection.keypoints):
+                # Glätte jedes Keypoint (x, y, confidence)
+                smoothed_keypoints = np.zeros_like(detection.keypoints)
+                for i, (new_kpt, old_kpt) in enumerate(zip(detection.keypoints, self.smoothed_keypoints)):
+                    # Nur x und y glätten, confidence direkt übernehmen
+                    smoothed_keypoints[i][0] = alpha * new_kpt[0] + (1 - alpha) * old_kpt[0]
+                    smoothed_keypoints[i][1] = alpha * new_kpt[1] + (1 - alpha) * old_kpt[1]
+                    smoothed_keypoints[i][2] = new_kpt[2]  # Confidence nicht glätten
+                
+                self.smoothed_keypoints = smoothed_keypoints
+            else:
+                # Erste Detection mit Keypoints oder Anzahl hat sich geändert
+                smoothed_keypoints = detection.keypoints.copy()
+                self.smoothed_keypoints = smoothed_keypoints
+        else:
+            smoothed_keypoints = detection.keypoints
         
         return Detection(
-            bbox=smoothed,
+            bbox=smoothed_bbox,
             confidence=detection.confidence,
             class_id=detection.class_id,
-            keypoints=detection.keypoints  # Keypoints übernehmen
+            keypoints=smoothed_keypoints
         )
     
     def reset(self):
@@ -150,6 +173,7 @@ class PersonTracker:
         """
         self.current_detection = None
         self.smoothed_bbox = None
+        self.smoothed_keypoints = None
         self.frames_without_detection = 0
         logger.debug("Tracker zurückgesetzt")
     

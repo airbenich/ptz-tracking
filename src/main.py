@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import config
-from src.utils.logger import setup_logger, get_logger
+from src.utils.logger import setup_logger, get_logger, update_all_loggers_level
 
 
 def parse_arguments():
@@ -202,6 +202,9 @@ def main():
     args = parse_arguments()
     apply_cli_args(args)
     
+    # Alle Logger-Level aktualisieren (falls --debug gesetzt wurde)
+    update_all_loggers_level(config.LOG_LEVEL)
+    
     # Logger einrichten
     logger = setup_logger(
         name="ptz_tracking.main",
@@ -225,6 +228,7 @@ def main():
     from src.stream.threaded_capture import ThreadedVideoCapture
     from src.tracking.person_detector import PersonDetector
     from src.tracking.tracker import PersonTracker
+    from src.tracking.multi_person_tracker import MultiPersonTracker
     from src.display.visualizer import Visualizer
     from src.utils.performance_manager import PerformanceManager
     
@@ -284,7 +288,10 @@ def main():
         
         # Tracker initialisieren
         logger.info("Initialisiere Tracker...")
-        tracker = PersonTracker()
+        if config.ENABLE_MULTI_PERSON_TRACKING:
+            tracker = MultiPersonTracker()
+        else:
+            tracker = PersonTracker()
         
         # PTZ-Controller initialisieren (wenn aktiviert)
         if config.ENABLE_PTZ:
@@ -294,7 +301,9 @@ def main():
             # REST-Server für PTZ-Steuerung (wenn aktiviert)
             if config.PTZ_REST_ENABLED:
                 logger.info("Starte PTZ REST-Server...")
-                ptz_rest_server = PTZRestServer(ptz_controller)
+                # Multi-Person-Tracker an REST-Server übergeben wenn aktiviert
+                tracker_for_rest = tracker if config.ENABLE_MULTI_PERSON_TRACKING else None
+                ptz_rest_server = PTZRestServer(ptz_controller, tracker_for_rest)
                 ptz_rest_server.start()
         
         # Performance Manager initialisieren
@@ -320,6 +329,12 @@ def main():
             logger.info("  q = Beenden")
             logger.info("  Space = Pause/Resume")
             logger.info("  r = Tracker zurücksetzen")
+            if config.ENABLE_MULTI_PERSON_TRACKING:
+                logger.info("  n = Nächste Person (loop)")
+            if config.ENABLE_PTZ:
+                logger.info("  p = PTZ-Tracking ein/aus")
+            if config.ENABLE_POSE_ESTIMATION:
+                logger.info("  s = Pose/Skeleton ein/aus")
             logger.info("  f = Vollbild-Toggle")
         else:
             logger.info("  Ctrl+C = Beenden")
@@ -369,7 +384,9 @@ def main():
                 
                 # Visualisierung (wenn nicht headless)
                 if not config.HEADLESS_MODE and visualizer:
-                    key = visualizer.show(frame, tracked_detection, ptz_controller)
+                    # Multi-Person-Tracker an Visualizer übergeben wenn aktiviert
+                    tracker_for_vis = tracker if config.ENABLE_MULTI_PERSON_TRACKING else None
+                    key = visualizer.show(frame, tracked_detection, ptz_controller, tracker_for_vis)
                     
                     # Key-Events
                     if key == ord('q'):
@@ -382,6 +399,24 @@ def main():
                     elif key == ord('r'):
                         logger.info("Tracker zurückgesetzt")
                         tracker.reset()
+                    elif key == ord('n'):
+                        # Zur nächsten Person wechseln (nur Multi-Person-Tracking)
+                        if config.ENABLE_MULTI_PERSON_TRACKING:
+                            new_id = tracker.select_next_person()
+                            logger.info(f"Gewechselt zu Person ID={new_id}")
+                    elif key == ord('p'):
+                        # PTZ-Tracking ein/aus (nur wenn PTZ aktiviert)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_status = ptz_controller.toggle()
+                            status_text = "aktiviert" if new_status else "deaktiviert"
+                            logger.info(f"PTZ-Tracking {status_text}")
+                    elif key == ord('s'):
+                        # Pose/Skeleton ein/aus (nur wenn Pose Estimation aktiviert)
+                        if config.ENABLE_POSE_ESTIMATION:
+                            config.SHOW_SKELETON = not config.SHOW_SKELETON
+                            config.SHOW_KEYPOINTS = not config.SHOW_KEYPOINTS
+                            status_text = "aktiviert" if config.SHOW_SKELETON else "deaktiviert"
+                            logger.info(f"Pose/Skeleton {status_text}")
                     elif key == ord('f'):
                         # Vollbild-Toggle
                         import cv2
@@ -411,6 +446,19 @@ def main():
                     elif key == ord(' '):
                         paused = False
                         logger.info("Stream fortgesetzt")
+                    elif key == ord('p'):
+                        # PTZ-Tracking ein/aus (auch im Pause-Modus)
+                        if config.ENABLE_PTZ and ptz_controller:
+                            new_status = ptz_controller.toggle()
+                            status_text = "aktiviert" if new_status else "deaktiviert"
+                            logger.info(f"PTZ-Tracking {status_text}")
+                    elif key == ord('s'):
+                        # Pose/Skeleton ein/aus (auch im Pause-Modus)
+                        if config.ENABLE_POSE_ESTIMATION:
+                            config.SHOW_SKELETON = not config.SHOW_SKELETON
+                            config.SHOW_KEYPOINTS = not config.SHOW_KEYPOINTS
+                            status_text = "aktiviert" if config.SHOW_SKELETON else "deaktiviert"
+                            logger.info(f"Pose/Skeleton {status_text}")
     
     except KeyboardInterrupt:
         logger.info("\nAnwendung durch Benutzer beendet")
@@ -429,7 +477,14 @@ def main():
             ptz_rest_server.stop()
         
         if ptz_controller:
-            logger.info("PTZ-Controller bereinigt")
+            logger.info("PTZ-Controller wird heruntergefahren...")
+            ptz_controller.shutdown()
+        
+        # Companion Client herunterfahren
+        if config.COMPANION_ENABLED:
+            from src.utils.companion_client import get_companion_client
+            companion = get_companion_client()
+            companion.shutdown()
         
         if threaded_capture:
             threaded_capture.stop()

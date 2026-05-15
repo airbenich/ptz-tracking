@@ -88,10 +88,13 @@ ENABLE_POSE_ESTIMATION = True
 POSE_MODEL = "yolov8n-pose.pt"
 
 # Keypoints anzeigen (Gelenke, Körperteile)
-SHOW_KEYPOINTS = True
+SHOW_KEYPOINTS = False
+
+# Face-Keypoints anzeigen (Nase, Augen, Ohren - Keypoints 0-4)
+SHOW_FACE_KEYPOINTS = True
 
 # Skeleton anzeigen (Linien zwischen Keypoints)
-SHOW_SKELETON = True
+SHOW_SKELETON = False
 
 # Keypoint-Farbe (BGR)
 KEYPOINT_COLOR = (255, 255, 255)  # Weiß
@@ -110,7 +113,7 @@ KEYPOINT_CONFIDENCE_THRESHOLD = 0.3
 
 # Transparenz für Skeleton und Keypoints (0.0 - 1.0)
 # 0.0 = komplett transparent, 1.0 = komplett opak
-POSE_OPACITY = 0.25  # 25% Opacity
+POSE_OPACITY = 0.5  # 50% Opacity
 
 # ============================================================================
 # PTZ-Kamera Steuerung (Panasonic AW-HE130)
@@ -193,10 +196,30 @@ TRACKING_METHOD = "largest_bbox"
 
 # Smoothing für stabileres Tracking
 SMOOTHING_ENABLED = True
-SMOOTHING_FACTOR = 0.3  # 0.0 = kein Smoothing, 1.0 = maximales Smoothing
+SMOOTHING_FACTOR = 0.7  # 0.0 = kein Smoothing, 1.0 = maximales Smoothing
 
 # Maximale Frames ohne Detection bevor Tracking zurückgesetzt wird
 MAX_FRAMES_WITHOUT_DETECTION = 30
+
+# ============================================================================
+# Multi-Person-Tracking Konfiguration
+# ============================================================================
+
+# Multi-Person-Tracking aktivieren (trackt alle Personen mit IDs)
+ENABLE_MULTI_PERSON_TRACKING = True
+
+# Maximale Distanz für Track-Zuordnung (Pixel)
+# Detections mit größerer Distanz werden als neue Person erkannt
+MULTI_PERSON_MAX_DISTANCE = 150
+
+# Alle Personen mit IDs anzeigen (nicht nur aktive)
+SHOW_ALL_TRACKED_PERSONS = True
+
+# Farbe für inaktive Personen (BGR)
+INACTIVE_PERSON_COLOR = (100, 100, 100)  # Grau
+
+# Farbe für aktive Person (BGR)
+ACTIVE_PERSON_COLOR = (255, 255, 255)  # Grün
 
 # ============================================================================
 # Display-Konfiguration
@@ -227,6 +250,11 @@ SHOW_FPS = True
 
 # Tracking-Informationen anzeigen (Position, Größe, etc.)
 SHOW_INFO = True
+
+# Headroom-Guide-Linie anzeigen (zeigt Zielposition für PTZ-Steuerung)
+SHOW_HEADROOM_LINE = True
+SHOW_HEADROOM_LINE_DEADZONE = False
+SHOW_HEADROOM_LINE_ON_PERSON = False
 
 # Vollbild-Modus
 FULLSCREEN = False

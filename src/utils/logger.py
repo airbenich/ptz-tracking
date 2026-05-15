@@ -143,6 +143,30 @@ def get_logger(name: str = "ptz_tracking") -> logging.Logger:
 logger = setup_logger()
 
 
+def update_all_loggers_level(level: str):
+    """
+    Aktualisiert das Log-Level aller existierenden Logger
+    
+    Nützlich um das Log-Level nach CLI-Argument-Verarbeitung zu aktualisieren
+    
+    Args:
+        level: Neues Log-Level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    """
+    log_level = getattr(logging, level.upper())
+    
+    # Root-Logger updaten
+    logging.root.setLevel(log_level)
+    
+    # Alle existierenden Logger updaten
+    for logger_name in logging.Logger.manager.loggerDict:
+        existing_logger = logging.getLogger(logger_name)
+        if isinstance(existing_logger, logging.Logger):
+            existing_logger.setLevel(log_level)
+            # Auch alle Handler des Loggers updaten
+            for handler in existing_logger.handlers:
+                handler.setLevel(log_level)
+
+
 # Convenience-Funktionen
 def debug(msg: str, *args, **kwargs):
     """Debug-Log"""

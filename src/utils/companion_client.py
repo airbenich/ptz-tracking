@@ -4,7 +4,9 @@ Push Custom Variables zu Companion via REST API
 """
 
 import requests
+import queue
 from typing import Optional, Any
+from threading import Thread
 from src.utils.logger import get_logger
 from src import config
 
@@ -36,14 +38,23 @@ class CompanionClient:
         self.timeout = timeout or config.COMPANION_TIMEOUT
         self.enabled = enabled if enabled is not None else config.COMPANION_ENABLED
         
+        # Asynchrone Command-Queue (non-blocking Variable Updates)
+        self.command_queue = queue.Queue(maxsize=50)  # Max 50 pending updates
+        self._shutdown = False
+        
+        # Worker-Thread für asynchrone HTTP-Requests
+        self.worker_thread = Thread(target=self._command_worker, daemon=True, name="Companion-Worker")
+        self.worker_thread.start()
+        
         if self.enabled:
-            logger.info(f"Companion Client initialisiert")
+            logger.info(f"Companion Client initialisiert (Async)")
             logger.info(f"  Server: {self.base_url}")
             logger.info(f"  Timeout: {self.timeout}s")
+            logger.info(f"  Async Queue: Worker-Thread gestartet")
     
     def set_variable(self, name: str, value: Any) -> bool:
         """
-        Setzt eine Custom Variable in Companion
+        Setzt eine Custom Variable in Companion (asynchron, non-blocking)
         
         API: POST /api/custom-variable/<name>/value?value=<value>
         
@@ -52,7 +63,7 @@ class CompanionClient:
             value: Wert der Variable (wird zu String konvertiert)
         
         Returns:
-            True wenn erfolgreich, False bei Fehler
+            True wenn in Queue eingefügt, False bei Fehler
         
         Example:
             client.set_variable("ptz_tracking_status", "ON")
@@ -62,6 +73,66 @@ class CompanionClient:
         if not self.enabled:
             return False
         
+        try:
+            # Befehl in Queue schreiben (non-blocking)
+            try:
+                self.command_queue.put_nowait((name, value))
+                logger.debug(f"Companion Variable queued: {name} = {value}")
+                return True
+            except queue.Full:
+                # Queue voll → ältesten Befehl verwerfen, neuen einfügen
+                try:
+                    self.command_queue.get_nowait()  # Ältesten entfernen
+                    self.command_queue.put_nowait((name, value))
+                    logger.debug(f"Companion Variable queued (dropped oldest): {name} = {value}")
+                    return True
+                except:
+                    logger.warning("Companion Queue: Fehler beim Verwerfen")
+                    return False
+        except Exception as e:
+            logger.error(f"Companion Queue Fehler: {e}")
+            return False
+    
+    def _command_worker(self):
+        """
+        Worker-Thread: Verarbeitet Companion Variable Updates asynchron
+        
+        Läuft in separatem Thread und sendet HTTP-Requests ohne Main-Thread zu blockieren
+        """
+        logger.info("Companion Worker-Thread gestartet")
+        
+        while not self._shutdown:
+            try:
+                # Warte auf nächsten Befehl (mit Timeout für Shutdown-Check)
+                try:
+                    name, value = self.command_queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue  # Kein Befehl → weiter warten
+                
+                # Befehl ausführen
+                self._execute_set_variable(name, value)
+                
+                # Queue-Task als erledigt markieren
+                self.command_queue.task_done()
+                
+            except Exception as e:
+                logger.error(f"Companion Worker-Thread Fehler: {e}")
+        
+        logger.info("Companion Worker-Thread beendet")
+    
+    def _execute_set_variable(self, name: str, value: Any) -> bool:
+        """
+        Führt Variable-Update tatsächlich aus (HTTP-Request)
+        
+        Wird vom Worker-Thread aufgerufen (nicht direkt verwenden!)
+        
+        Args:
+            name: Variablenname
+            value: Wert der Variable
+        
+        Returns:
+            True wenn erfolgreich, False bei Fehler
+        """
         try:
             # URL erstellen
             url = f"{self.base_url}/api/custom-variable/{name}/value"
@@ -140,9 +211,30 @@ class CompanionClient:
         """Gibt aktuellen Status zurück"""
         return self.enabled
     
+    def shutdown(self):
+        """
+        Beendet Companion Client sauber
+        
+        Stoppt Worker-Thread und wartet auf Queue-Leerung
+        """
+        logger.info("Companion Client wird heruntergefahren...")
+        
+        # Worker-Thread beenden
+        self._shutdown = True
+        
+        # Warten auf Thread-Ende (max 2 Sekunden)
+        if self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=2.0)
+            if self.worker_thread.is_alive():
+                logger.warning("Companion Worker-Thread konnte nicht sauber beendet werden")
+            else:
+                logger.info("Companion Worker-Thread beendet")
+        
+        logger.info("Companion Client heruntergefahren")
+    
     def test_connection(self) -> bool:
         """
-        Testet Verbindung zu Companion
+        Testet Verbindung zu Companion (synchron)
         
         Returns:
             True wenn erreichbar, False sonst
@@ -151,8 +243,8 @@ class CompanionClient:
             return False
         
         try:
-            # Versuche eine Test-Variable zu setzen
-            result = self.set_variable("ptz_tracking_test", "OK")
+            # Synchroner Test (direkt HTTP-Request, nicht über Queue)
+            result = self._execute_set_variable("ptz_tracking_test", "OK")
             if result:
                 logger.info("✓ Companion Verbindung OK")
             return result
