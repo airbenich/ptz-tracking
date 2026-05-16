@@ -406,12 +406,36 @@ def main():
                         if config.ENABLE_MULTI_PERSON_TRACKING:
                             new_id = tracker.select_next_person()
                             logger.info(f"Gewechselt zu Person ID={new_id}")
+                    elif key == 252:  # ord('ü')
+                        # Gruppen-Tracking Toggle (nur Multi-Person-Tracking)
+                        if config.ENABLE_MULTI_PERSON_TRACKING:
+                            if tracker.group_tracking_enabled:
+                                # Gruppen-Tracking stoppen
+                                tracker.stop_group_tracking()
+                                if ptz_controller:
+                                    ptz_controller.disable()
+                                logger.info("Gruppen-Tracking gestoppt, PTZ deaktiviert")
+                            else:
+                                # Gruppen-Tracking starten
+                                num_persons = tracker.start_group_tracking()
+                                if num_persons > 0:
+                                    if ptz_controller:
+                                        ptz_controller.enable()
+                                    logger.info(f"Gruppen-Tracking gestartet: {num_persons} Personen, PTZ aktiviert")
+                                else:
+                                    logger.warning("Keine Personen für Gruppen-Tracking verfügbar")
                     elif key == ord('p'):
-                        # PTZ-Tracking ein/aus (nur wenn PTZ aktiviert)
+                        # PTZ-Tracking ein/aus (nur wenn PTZ aktiviert, Einzelpersonen-Modus)
                         if config.ENABLE_PTZ and ptz_controller:
+                            # Stoppe Gruppen-Tracking falls aktiv
+                            if config.ENABLE_MULTI_PERSON_TRACKING and tracker.group_tracking_enabled:
+                                tracker.stop_group_tracking()
+                                logger.info("Gruppen-Tracking gestoppt")
+                            
+                            # Toggle PTZ (Einzelperson)
                             new_status = ptz_controller.toggle()
                             status_text = "aktiviert" if new_status else "deaktiviert"
-                            logger.info(f"PTZ-Tracking {status_text}")
+                            logger.info(f"PTZ-Tracking (Einzelperson) {status_text}")
                     elif key == ord('s'):
                         # Pose/Skeleton ein/aus (nur wenn Pose Estimation aktiviert)
                         if config.ENABLE_POSE_ESTIMATION:
@@ -458,6 +482,22 @@ def main():
                     elif key == ord(' '):
                         paused = False
                         logger.info("Stream fortgesetzt")
+                    elif key == 252:  # ord('ü')
+                        # Gruppen-Tracking Toggle (auch im Pause-Modus)
+                        if config.ENABLE_MULTI_PERSON_TRACKING:
+                            if tracker.group_tracking_enabled:
+                                tracker.stop_group_tracking()
+                                if ptz_controller:
+                                    ptz_controller.disable()
+                                logger.info("Gruppen-Tracking gestoppt, PTZ deaktiviert")
+                            else:
+                                num_persons = tracker.start_group_tracking()
+                                if num_persons > 0:
+                                    if ptz_controller:
+                                        ptz_controller.enable()
+                                    logger.info(f"Gruppen-Tracking gestartet: {num_persons} Personen, PTZ aktiviert")
+                                else:
+                                    logger.warning("Keine Personen für Gruppen-Tracking verfügbar")
                     elif key == ord('p'):
                         # PTZ-Tracking ein/aus (auch im Pause-Modus)
                         if config.ENABLE_PTZ and ptz_controller:

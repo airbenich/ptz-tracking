@@ -214,11 +214,18 @@ class Visualizer:
         # Alle Tracks holen
         tracks = multi_person_tracker.get_all_tracks()
         active_track_id = multi_person_tracker.active_track_id
+        group_member_ids = multi_person_tracker.get_group_member_ids()
         
         for track in tracks:
-            is_active = (track.track_id == active_track_id)
+            # Person ist "aktiv" wenn:
+            # - Einzelmodus: track_id == active_track_id
+            # - Gruppenmodus: track_id in group_frozen_track_ids
+            is_active = (
+                track.track_id == active_track_id or
+                track.track_id in group_member_ids
+            )
             
-            # Für aktive Person: Geglättete Detection verwenden
+            # Für aktive Person(en): Geglättete Detection verwenden
             if is_active:
                 detection = multi_person_tracker.get_active_detection()
                 if detection is None:
@@ -272,11 +279,18 @@ class Visualizer:
                 bbox_center_x = (detection.x1 + detection.x2) // 2
                 label_y = detection.y1
             
-            # Label mit Track-ID
-            label = f"PERSON: {track.track_id}"
-            if is_active and not ptz_enabled:
+            # Label mit Track-ID oder GROUP
+            # Im Gruppen-Tracking Modus: Zeige "GROUP" statt "PERSON: X"
+            if is_active and multi_person_tracker.group_tracking_enabled:
+                label = "GROUP"
+            else:
+                label = f"PERSON: {track.track_id}"
+            
+            if is_active and not ptz_enabled and not multi_person_tracker.group_tracking_enabled:
                 label += " SELECTED"
-            if is_active and ptz_enabled:
+            if is_active and ptz_enabled and not multi_person_tracker.group_tracking_enabled:
+                label += " TRACKING"
+            if is_active and ptz_enabled and multi_person_tracker.group_tracking_enabled:
                 label += " TRACKING"
             
             label_size, _ = cv2.getTextSize(
@@ -558,10 +572,11 @@ class Visualizer:
         self,
         frame: np.ndarray,
         detection: Optional[Detection] = None,
-        ptz_controller = None
+        ptz_controller = None,
+        multi_person_tracker = None
     ) -> np.ndarray:
         """
-        Zeichnet Headroom-Visualisierung
+        Zeichnet Headroom-Visualisierung und Tracking-Modus
         
         Zeigt die Soll-Position für die BBox-Oberkante (PTZ_HEADROOM)
         und die aktuelle Position an.
@@ -570,6 +585,7 @@ class Visualizer:
             frame: Input-Frame
             detection: Optional Detection für aktuelle BBox-Position
             ptz_controller: PTZ-Controller (aktuell nicht verwendet)
+            multi_person_tracker: MultiPersonTracker für Tracking-Modus-Anzeige
         
         Returns:
             Frame mit Headroom-Guide
@@ -725,7 +741,7 @@ class Visualizer:
         display_frame = frame.copy()
         
         # 1. Headroom-Guide zeichnen (Hintergrund - Deadzone + Linie)
-        display_frame = self.draw_headroom_guide(display_frame, detection, ptz_controller)
+        display_frame = self.draw_headroom_guide(display_frame, detection, ptz_controller, multi_person_tracker)
         
         # 2. Multi-Person-Tracking zeichnen (alle Personen mit BBoxen)
         if multi_person_tracker is not None:

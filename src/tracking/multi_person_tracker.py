@@ -15,6 +15,37 @@ from src import config
 logger = get_logger(__name__)
 
 
+class PendingTrack:
+    """
+    Noch nicht bestätigter Track - wartet auf konsekutive Detections
+    Verhindert ID-Flackern durch kurzzeitige Fehl-Detections
+    """
+    
+    def __init__(self, detection: Detection):
+        """
+        Args:
+            detection: Erste Detection
+        """
+        self.detection = detection
+        self.consecutive_detections = 1
+        self.last_center = detection.center
+    
+    def update(self, detection: Detection):
+        """
+        Aktualisiert mit neuer Detection
+        
+        Args:
+            detection: Neue Detection
+        """
+        self.detection = detection
+        self.consecutive_detections += 1
+        self.last_center = detection.center
+    
+    def is_confirmed(self) -> bool:
+        """Prüft ob Track bestätigt werden kann"""
+        return self.consecutive_detections >= config.MIN_CONSECUTIVE_DETECTIONS
+
+
 class TrackedPerson:
     """
     Eine getrackte Person mit persistenter ID und Historie
@@ -116,14 +147,20 @@ class MultiPersonTracker:
         self.smoothing_factor = smoothing_factor or config.SMOOTHING_FACTOR
         
         self.tracks: Dict[int, TrackedPerson] = {}  # track_id -> TrackedPerson
+        self.pending_tracks: List[PendingTrack] = []  # Noch nicht bestätigte Tracks
         self.next_track_id = 1
         self.active_track_id: Optional[int] = None  # Manuell ausgewählte Person
+        
+        # Gruppen-Tracking
+        self.group_tracking_enabled: bool = False
+        self.group_frozen_track_ids: set = set()  # Eingefrorene Track-IDs für Gruppen-Tracking
         
         self.smoothed_bbox: Optional[tuple] = None
         self.smoothed_keypoints: Optional[np.ndarray] = None
         
         logger.info(f"Multi-Person Tracker initialisiert")
         logger.info(f"Max Distance: {self.max_distance_threshold}px")
+        logger.info(f"Min Consecutive Detections: {config.MIN_CONSECUTIVE_DETECTIONS}")
         logger.info(f"Smoothing: {self.smoothing_enabled} (Factor: {self.smoothing_factor})")
     
     def update(self, detections: List[Detection], frame_shape: tuple) -> Optional[Detection]:
@@ -144,14 +181,13 @@ class MultiPersonTracker:
         for track_id, detection in zip(matched_tracks, matched_detections):
             self.tracks[track_id].update(detection)
         
-        # 3. Unmatched Detections als neue Tracks hinzufügen
+        # 3. Unmatched Detections verarbeiten (mit Pending-Tracks für Hysterese)
         unmatched_detections = [
             det for i, det in enumerate(detections) 
             if i not in [detections.index(d) for d in matched_detections]
         ]
         
-        for detection in unmatched_detections:
-            self._create_new_track(detection)
+        self._process_unmatched_detections(unmatched_detections)
         
         # 4. Alle nicht gematchten Tracks als "missing" markieren
         for track_id, track in self.tracks.items():
@@ -230,6 +266,60 @@ class MultiPersonTracker:
         dy = point1[1] - point2[1]
         return (dx**2 + dy**2) ** 0.5
     
+    def _process_unmatched_detections(self, unmatched_detections: List[Detection]):
+        """
+        Verarbeitet ungematchte Detections mit Hysterese-System
+        Verhindert ID-Flackern durch kurzzeitige Fehl-Detections
+        
+        Args:
+            unmatched_detections: Liste von Detections ohne Match zu existierenden Tracks
+        """
+        if not unmatched_detections:
+            # Keine neuen Detections: Pending Tracks löschen (nicht mehr sichtbar)
+            self.pending_tracks.clear()
+            return
+        
+        # Versuche unmatched Detections zu bestehenden Pending Tracks zuzuordnen
+        matched_pending_indices = []
+        used_detection_indices = set()
+        
+        for i, pending in enumerate(self.pending_tracks):
+            best_distance = float('inf')
+            best_detection_idx = None
+            
+            for j, detection in enumerate(unmatched_detections):
+                if j in used_detection_indices:
+                    continue
+                
+                distance = self._calculate_distance(pending.last_center, detection.center)
+                
+                if distance < best_distance and distance < self.max_distance_threshold:
+                    best_distance = distance
+                    best_detection_idx = j
+            
+            if best_detection_idx is not None:
+                # Pending Track mit neuer Detection aktualisieren
+                pending.update(unmatched_detections[best_detection_idx])
+                matched_pending_indices.append(i)
+                used_detection_indices.add(best_detection_idx)
+                
+                # Prüfen ob Track jetzt bestätigt werden kann
+                if pending.is_confirmed():
+                    self._create_new_track(pending.detection)
+                    logger.debug(f"Pending Track bestätigt nach {pending.consecutive_detections} Frames")
+        
+        # Bestätigte Pending Tracks entfernen
+        self.pending_tracks = [
+            p for i, p in enumerate(self.pending_tracks) 
+            if i not in matched_pending_indices or not p.is_confirmed()
+        ]
+        
+        # Neue Detections ohne Match: Als Pending Tracks hinzufügen
+        for j, detection in enumerate(unmatched_detections):
+            if j not in used_detection_indices:
+                self.pending_tracks.append(PendingTrack(detection))
+                logger.debug(f"Neuer Pending Track @ {detection.center}")
+    
     def _create_new_track(self, detection: Detection) -> int:
         """
         Erstellt neuen Track für eine Detection
@@ -280,11 +370,16 @@ class MultiPersonTracker:
     
     def get_active_detection(self) -> Optional[Detection]:
         """
-        Gibt Detection der aktiv verfolgten Person zurück
+        Gibt Detection zurück - entweder Einzel- oder Gruppen-Detection
         
         Returns:
             Detection oder None
         """
+        # Gruppen-Tracking aktiv: Virtuelle Detection aller eingefrorenen Personen
+        if self.group_tracking_enabled:
+            return self._create_group_detection()
+        
+        # Einzelpersonen-Tracking: Nur aktive Person
         if self.active_track_id is None or self.active_track_id not in self.tracks:
             return None
         
@@ -433,6 +528,112 @@ class MultiPersonTracker:
         """
         return list(self.tracks.values())
     
+    def start_group_tracking(self) -> int:
+        """
+        Startet Gruppen-Tracking mit aktuell sichtbaren Personen
+        Friert die aktuellen Track-IDs ein (keine neuen Personen werden aufgenommen)
+        
+        Returns:
+            Anzahl der eingefrorenen Personen
+        """
+        # Aktuell aktive Personen einfrieren
+        self.group_frozen_track_ids = {
+            track_id for track_id, track in self.tracks.items() 
+            if track.is_active
+        }
+        self.group_tracking_enabled = True
+        
+        # Smoothing zurücksetzen
+        self.smoothed_bbox = None
+        self.smoothed_keypoints = None
+        
+        logger.info(f"Gruppen-Tracking gestartet: {len(self.group_frozen_track_ids)} Personen eingefroren")
+        return len(self.group_frozen_track_ids)
+    
+    def stop_group_tracking(self):
+        """Stoppt Gruppen-Tracking"""
+        self.group_tracking_enabled = False
+        self.group_frozen_track_ids.clear()
+        self.smoothed_bbox = None
+        self.smoothed_keypoints = None
+        logger.info("Gruppen-Tracking gestoppt")
+    
+    def toggle_group_tracking(self) -> bool:
+        """
+        Toggle Gruppen-Tracking ein/aus
+        
+        Returns:
+            Neuer Status (True=aktiv, False=inaktiv)
+        """
+        if self.group_tracking_enabled:
+            self.stop_group_tracking()
+            return False
+        else:
+            self.start_group_tracking()
+            return True
+    
+    def _create_group_detection(self) -> Optional[Detection]:
+        """
+        Erstellt virtuelle Detection aus eingefrorenen Personen
+        - PAN: Center der umschließenden HeadBBox
+        - TILT: Oberste Kante der umschließenden HeadBBox
+        
+        Returns:
+            Virtuelle Detection oder None wenn keine Personen
+        """
+        # Nur eingefrorene Personen verwenden (verhindert neue Personen)
+        frozen_persons = [
+            self.tracks[tid].detection for tid in self.group_frozen_track_ids
+            if tid in self.tracks and self.tracks[tid].is_active
+        ]
+        
+        if not frozen_persons:
+            logger.debug("Keine aktiven Personen für Gruppen-Tracking")
+            return None
+        
+        # HeadBBoxen sammeln
+        head_bboxes = []
+        for detection in frozen_persons:
+            head_bbox = detection.get_head_bbox()
+            if head_bbox:
+                head_bboxes.append(head_bbox)
+        
+        # Fallback: Body-BBoxen wenn keine HeadBBoxen verfügbar
+        if not head_bboxes:
+            logger.debug("Keine HeadBBoxen verfügbar, verwende Body-BBoxen")
+            head_bboxes = [det.bbox for det in frozen_persons]
+        
+        # Umschließende BBox um alle Köpfe
+        min_x1 = min(bbox[0] for bbox in head_bboxes)
+        min_y1 = min(bbox[1] for bbox in head_bboxes)  # Oberste Kante für TILT
+        max_x2 = max(bbox[2] for bbox in head_bboxes)
+        max_y2 = max(bbox[3] for bbox in head_bboxes)
+        
+        avg_confidence = sum(d.confidence for d in frozen_persons) / len(frozen_persons)
+        
+        # Virtuelle Detection erstellen
+        # keypoints=None damit PTZ den BBox-Center für PAN verwendet
+        group_detection = Detection(
+            bbox=(min_x1, min_y1, max_x2, max_y2),
+            confidence=avg_confidence,
+            class_id=0,
+            keypoints=None
+        )
+        
+        logger.debug(f"Gruppen-Detection: {len(frozen_persons)} Personen, "
+                    f"BBox=({min_x1:.0f},{min_y1:.0f},{max_x2:.0f},{max_y2:.0f})")
+        
+        return group_detection
+    
+    def get_group_member_ids(self) -> set:
+        """
+        Gibt IDs der Gruppen-Mitglieder zurück (für Visualisierung)
+        
+        Returns:
+            Set der Track-IDs oder leeres Set
+        """
+        return self.group_frozen_track_ids if self.group_tracking_enabled else set()
+    
     def get_status(self) -> dict:
         """
         Gibt Status des Trackers zurück (für REST-API)
@@ -443,13 +644,19 @@ class MultiPersonTracker:
         return {
             "total_tracks": len(self.tracks),
             "active_track_id": self.active_track_id,
+            "group_tracking_enabled": self.group_tracking_enabled,
+            "group_member_count": len(self.group_frozen_track_ids) if self.group_tracking_enabled else 0,
             "tracks": [track.to_dict() for track in self.tracks.values()]
         }
     
     def reset(self):
         """Setzt Tracker komplett zurück"""
         self.tracks.clear()
+        self.pending_tracks.clear()
         self.next_track_id = 1
         self.active_track_id = None
+        self.group_tracking_enabled = False
+        self.group_frozen_track_ids.clear()
         self.smoothed_bbox = None
+        self.smoothed_keypoints = None
         logger.info("Multi-Person Tracker zurückgesetzt")

@@ -231,6 +231,47 @@ class PTZRestHandler(BaseHTTPRequestHandler):
             })
             return
         
+        # GET /tracking/group/toggle - Gruppen-Tracking ein/aus
+        elif path == '/tracking/group/toggle':
+            if self.multi_person_tracker is None:
+                self._send_json_response(500, {
+                    "error": "Multi-Person-Tracker nicht verfügbar"
+                })
+                return
+            
+            # Gruppen-Tracking toggle
+            new_status = self.multi_person_tracker.toggle_group_tracking()
+            
+            if new_status:
+                # Gruppen-Tracking aktiviert
+                num_persons = len(self.multi_person_tracker.group_frozen_track_ids)
+                
+                # PTZ aktivieren wenn verfügbar
+                if self.ptz_controller is not None:
+                    self.ptz_controller.enable()
+                
+                self._send_json_response(200, {
+                    "success": True,
+                    "message": f"Gruppen-Tracking aktiviert: {num_persons} Personen, PTZ aktiviert",
+                    "group_tracking_enabled": True,
+                    "num_persons": num_persons,
+                    "ptz_enabled": self.ptz_controller.is_enabled() if self.ptz_controller else False
+                })
+            else:
+                # Gruppen-Tracking deaktiviert
+                
+                # PTZ deaktivieren wenn verfügbar
+                if self.ptz_controller is not None:
+                    self.ptz_controller.disable()
+                
+                self._send_json_response(200, {
+                    "success": True,
+                    "message": "Gruppen-Tracking deaktiviert, PTZ deaktiviert",
+                    "group_tracking_enabled": False,
+                    "ptz_enabled": self.ptz_controller.is_enabled() if self.ptz_controller else False
+                })
+            return
+        
         # ====================================================================
         # Display-Endpoints (Visualisierung)
         # ====================================================================
@@ -308,7 +349,8 @@ class PTZRestHandler(BaseHTTPRequestHandler):
                     "tracking": {
                         "/tracking/next": "Zur nächsten Person wechseln (loop)",
                         "/tracking/select?id=X": "Spezifische Person auswählen",
-                        "/tracking/status": "Status aller getracken Personen"
+                        "/tracking/status": "Status aller getracken Personen",
+                        "/tracking/group/toggle": "Gruppen-Tracking ein/aus (alle sichtbaren Personen)"
                     },
                     "display": {
                         "/display/pose/toggle": "Pose/Skeleton ein/aus",
@@ -402,6 +444,7 @@ class PTZRestServer:
                 logger.info(f"    http://{self.host}:{self.port}/tracking/next")
                 logger.info(f"    http://{self.host}:{self.port}/tracking/select?id=X")
                 logger.info(f"    http://{self.host}:{self.port}/tracking/status")
+                logger.info(f"    http://{self.host}:{self.port}/tracking/group/toggle")
             
         except OSError as e:
             logger.error(f"Fehler beim Starten des REST-Servers: {e}")

@@ -201,7 +201,7 @@ SMOOTHING_ENABLED = True
 SMOOTHING_FACTOR = 0.7  # 0.0 = kein Smoothing, 1.0 = maximales Smoothing
 
 # Maximale Frames ohne Detection bevor Tracking zurückgesetzt wird
-MAX_FRAMES_WITHOUT_DETECTION = 30
+MAX_FRAMES_WITHOUT_DETECTION = 90  # ~3 Sekunden bei 30 FPS - verhindert ID-Verlust bei kurzen Ausfällen
 
 # ============================================================================
 # Multi-Person-Tracking Konfiguration
@@ -212,7 +212,11 @@ ENABLE_MULTI_PERSON_TRACKING = True
 
 # Maximale Distanz für Track-Zuordnung (Pixel)
 # Detections mit größerer Distanz werden als neue Person erkannt
-MULTI_PERSON_MAX_DISTANCE = 150
+MULTI_PERSON_MAX_DISTANCE = 200  # Erhöht für bessere Zuordnung bei Bewegung
+
+# Minimale konsekutive Detections bevor neue Track-ID vergeben wird
+# Verhindert "Flackern" durch kurzzeitige Fehl-Detections
+MIN_CONSECUTIVE_DETECTIONS = 3  # Neue Person muss 3 Frames lang erkannt werden
 
 # Alle Personen mit IDs anzeigen (nicht nur aktive)
 SHOW_ALL_TRACKED_PERSONS = True
