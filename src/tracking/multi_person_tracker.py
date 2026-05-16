@@ -14,6 +14,16 @@ from src import config
 
 logger = get_logger(__name__)
 
+# Companion Client (optional)
+try:
+    if config.COMPANION_ENABLED:
+        from src.utils.companion_client import get_companion_client
+        _companion_available = True
+    else:
+        _companion_available = False
+except:
+    _companion_available = False
+
 
 class PendingTrack:
     """
@@ -162,6 +172,14 @@ class MultiPersonTracker:
         logger.info(f"Max Distance: {self.max_distance_threshold}px")
         logger.info(f"Min Consecutive Detections: {config.MIN_CONSECUTIVE_DETECTIONS}")
         logger.info(f"Smoothing: {self.smoothing_enabled} (Factor: {self.smoothing_factor})")
+        
+        # Initiale Companion Variable setzen
+        if _companion_available:
+            try:
+                companion = get_companion_client()
+                companion.set_variable("ptz_tracking_mode", "SINGLE")
+            except Exception as e:
+                logger.debug(f"Companion Variable setzen fehlgeschlagen: {e}")
     
     def update(self, detections: List[Detection], frame_shape: tuple) -> Optional[Detection]:
         """
@@ -547,6 +565,14 @@ class MultiPersonTracker:
         self.smoothed_bbox = None
         self.smoothed_keypoints = None
         
+        # Companion Variable setzen
+        if _companion_available:
+            try:
+                companion = get_companion_client()
+                companion.set_variable("ptz_tracking_mode", "GROUP")
+            except Exception as e:
+                logger.debug(f"Companion Variable setzen fehlgeschlagen: {e}")
+        
         logger.info(f"Gruppen-Tracking gestartet: {len(self.group_frozen_track_ids)} Personen eingefroren")
         return len(self.group_frozen_track_ids)
     
@@ -556,6 +582,15 @@ class MultiPersonTracker:
         self.group_frozen_track_ids.clear()
         self.smoothed_bbox = None
         self.smoothed_keypoints = None
+        
+        # Companion Variable setzen
+        if _companion_available:
+            try:
+                companion = get_companion_client()
+                companion.set_variable("ptz_tracking_mode", "SINGLE")
+            except Exception as e:
+                logger.debug(f"Companion Variable setzen fehlgeschlagen: {e}")
+        
         logger.info("Gruppen-Tracking gestoppt")
     
     def toggle_group_tracking(self) -> bool:
