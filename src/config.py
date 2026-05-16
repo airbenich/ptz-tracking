@@ -146,6 +146,8 @@ PTZ_DEADZONE_Y = 0.02  # ±2% vertikal
 # Speed-basierte Steuerung (PTS-Befehle)
 # Speed-Range: 01-99, wobei 50=Stop, <50=links/unten, >50=rechts/oben
 PTZ_MAX_SPEED = 80      # Maximale Geschwindigkeit (bei großer Distanz)
+PTZ_MAX_PAN_SPEED = 25  # Maximale Pan-Geschwindigkeit (sanftere horizontale Bewegung, ±25 von Stop=50)
+PTZ_MAX_TILT_SPEED = 25 # Maximale Tilt-Geschwindigkeit (sanftere vertikale Bewegung, ±25 von Stop=50)
 PTZ_MIN_SPEED = 5       # Minimale Geschwindigkeit (nahe am Ziel)
 PTZ_SPEED_RAMP = 0   # Speed-Ramping-Faktor (0.0-1.0, höher=progressiver) - 0 = linear, schneller
 

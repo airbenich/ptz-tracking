@@ -79,7 +79,7 @@ class PTZController:
         logger.info(f"  Kamera: {self.camera_ip}:{self.camera_port}")
         logger.info(f"  Enabled: {self.enabled}")
         logger.info(f"  Target Position: X={config.PTZ_TARGET_X} (center), Headroom={config.PTZ_HEADROOM}")
-        logger.info(f"  Speed Range: {config.PTZ_MIN_SPEED}-{config.PTZ_MAX_SPEED}")
+        logger.info(f"  Speed Range: {config.PTZ_MIN_SPEED}-{config.PTZ_MAX_SPEED} (Pan: ±{config.PTZ_MAX_PAN_SPEED}, Tilt: ±{config.PTZ_MAX_TILT_SPEED})")
         logger.info(f"  Speed Smoothing: {config.PTZ_SPEED_SMOOTHING}")
         logger.info(f"  Speed Ramp: {config.PTZ_SPEED_RAMP}")
         logger.info(f"  Async Queue: Worker-Thread gestartet")
@@ -200,7 +200,7 @@ class PTZController:
             # delta_y: negativ wenn Person oben → nach Umkehr -delta_y: positiv → Kamera hoch
             if axis == 'tilt' and delta > 0:
                 # Verstärke Aufwärts-Bewegung um Faktor 3
-                delta = delta * 3.0
+                delta = delta * 1.5
             
             # Distanz mit Ramping-Faktor (macht Bewegung progressiver)
             # Ohne Ramping: linear (delta)
@@ -210,6 +210,14 @@ class PTZController:
             # Speed berechnen (proportional zu ramped_delta)
             # Speed-Range: MIN_SPEED bis MAX_SPEED
             speed_offset = ramped_delta * config.PTZ_MAX_SPEED
+            
+            # Pan-Limitierung: Maximal ±PTZ_MAX_PAN_SPEED für sanftere horizontale Bewegung
+            if axis == 'pan':
+                speed_offset = max(-config.PTZ_MAX_PAN_SPEED, min(config.PTZ_MAX_PAN_SPEED, speed_offset))
+            
+            # Tilt-Limitierung: Maximal ±PTZ_MAX_TILT_SPEED für sanftere vertikale Bewegung
+            if axis == 'tilt':
+                speed_offset = max(-config.PTZ_MAX_TILT_SPEED, min(config.PTZ_MAX_TILT_SPEED, speed_offset))
             
             # Minimal-Speed einhalten (außer Stop)
             if abs(speed_offset) > 0:
@@ -448,6 +456,8 @@ class PTZController:
                 "current_tilt_speed": self.current_tilt_speed,
                 "speed_smoothing": config.PTZ_SPEED_SMOOTHING,
                 "max_speed": config.PTZ_MAX_SPEED,
+                "max_pan_speed": config.PTZ_MAX_PAN_SPEED,
+                "max_tilt_speed": config.PTZ_MAX_TILT_SPEED,
                 "min_speed": config.PTZ_MIN_SPEED,
                 "speed_ramp": config.PTZ_SPEED_RAMP,
                 "headroom": config.PTZ_HEADROOM,
