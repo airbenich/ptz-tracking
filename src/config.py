@@ -29,10 +29,10 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 VIDEO_SOURCE = "gstreamer"
 
 # GStreamer Input-Device: "Blackmagic", "Elgato", "Webcam"
-GSTREAMER_INPUT_DEVICE = "Blackmagic"
+GSTREAMER_INPUT_DEVICE = "Elgato"
 
 # ffmpeg Input-Device: "Blackmagic", "Elgato", "Webcam" (Legacy)
-FFMPEG_INPUT_DEVICE = "Blackmagic"
+FFMPEG_INPUT_DEVICE = "Elgato"
 
 # Video-Auflösung (Input)
 RESOLUTION = (1920, 1080)  # Full HD
@@ -55,7 +55,7 @@ FFMPEG_DEVICE_NAMES = {
 
 # ffmpeg-Kommando-Template (wird in ffmpeg_handler.py verwendet)
 # Für Linux: "-f v4l2" statt "-f avfoundation"
-FFMPEG_INPUT_FORMAT = "avfoundation"  # macOS: avfoundation, Linux: v4l2
+FFMPEG_INPUT_FORMAT = "v4l2"  # macOS: avfoundation, Linux: v4l2
 
 # Video-Datei Pfad (wenn VIDEO_SOURCE = "file")
 VIDEO_FILE_PATH = ""
@@ -436,7 +436,7 @@ def validate_config():
         print(f"ℹ️  YOLO-Modell {MODEL} wird beim ersten Start heruntergeladen.")
     
     # Video-Source validieren
-    if VIDEO_SOURCE not in ["ffmpeg", "webcam", "file"]:
+    if VIDEO_SOURCE not in ["gstreamer", "ffmpeg", "webcam", "file"]:
         raise ValueError(f"Ungültige VIDEO_SOURCE: {VIDEO_SOURCE}")
     
     # Bei file-Quelle: Pfad prüfen

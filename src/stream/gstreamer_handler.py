@@ -118,10 +118,8 @@ class GStreamerHandler(VideoSource):
         elif self.system == "Linux":
             pipeline = (
                 f"v4l2src device=/dev/video{self.device_number} "
-                f"! image/jpeg,width={width},height={height},framerate={self.fps}/1 "
-                f"! jpegdec "
                 f"! videoconvert "
-                f"! video/x-raw,format=BGR "
+                f"! video/x-raw,format=BGR,width={width},height={height},framerate={self.fps}/1 "
                 f"! appsink name=sink max-buffers=2 drop=true emit-signals=true"
             )
         
