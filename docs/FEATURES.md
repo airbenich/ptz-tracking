@@ -1,10 +1,34 @@
-# PTZ-Steuerung für Panasonic AW-HE130
+# PTZ Tracking Features
+
+Vollständige Dokumentation der Hauptfunktionen: PTZ-Kamerasteuerung und Multi-Person-Tracking.
+
+---
+
+## Inhaltsverzeichnis
+
+1. [PTZ-Steuerung](#ptz-steuerung)
+   - [Übersicht](#übersicht)
+   - [Features](#ptz-features)
+   - [Konfiguration](#ptz-konfiguration)
+   - [REST-API](#ptz-rest-api)
+   - [Performance](#ptz-performance)
+   - [Troubleshooting](#ptz-troubleshooting)
+2. [Multi-Person Tracking](#multi-person-tracking)
+   - [Übersicht](#multi-person-übersicht)
+   - [Features](#multi-person-features)
+   - [Konfiguration](#multi-person-konfiguration)
+   - [REST-API](#multi-person-rest-api)
+   - [Technische Details](#technische-details)
+
+---
+
+# PTZ-Steuerung
 
 ## Übersicht
 
 Die PTZ-Tracking-Steuerung ermöglicht automatisches Schwenken und Neigen (Pan/Tilt) der Panasonic AW-HE130 Kamera, um eine Person im Bild zu zentrieren.
 
-## Features
+## PTZ Features
 
 - **Automatische Person-Zentrierung** - Person wird horizontal in der Mitte gehalten  
 - **Goldener Schnitt** - Vertikale Positionierung nach goldenem Schnitt (0.618 von unten)  
@@ -42,7 +66,7 @@ chmod +x install-gstreamer.sh
 ./install-gstreamer.sh
 ```
 
-**Details:** [GSTREAMER_QUICKSTART.md](../GSTREAMER_QUICKSTART.md)
+**Details:** [GSTREAMER.md](GSTREAMER.md)
 
 ### FFmpeg (Fallback)
 
@@ -58,7 +82,7 @@ VIDEO_SOURCE = "ffmpeg"
 FFMPEG_INPUT_DEVICE = "Blackmagic"
 ```  
 
-## Konfiguration
+## PTZ Konfiguration
 
 Alle PTZ-Einstellungen finden sich in `src/config.py`:
 
@@ -91,8 +115,6 @@ PTZ_SPEED_SMOOTHING = 0.3  # 30% neue Speed, 70% alte Speed
 # Update-Interval (130ms Minimum laut Panasonic Spec)
 PTZ_UPDATE_INTERVAL = 0.13
 
-# PTZ Speed-Neutral (50 = Stop)
-
 # REST-API
 PTZ_REST_ENABLED = True
 PTZ_REST_HOST = "0.0.0.0"
@@ -102,7 +124,7 @@ PTZ_REST_PORT = 8080
 PTZ_ENABLED_ON_START = False  # Startet deaktiviert
 ```
 
-## Goldener Schnitt
+### Goldener Schnitt
 
 Die vertikale Positionierung nutzt den goldenen Schnitt (φ ≈ 1.618):
 - Person soll bei **0.618 von unten** positioniert sein
@@ -119,7 +141,7 @@ Die vertikale Positionierung nutzt den goldenen Schnitt (φ ≈ 1.618):
 └─────────────────┘  ← 1.0 (unten)
 ```
 
-## REST-API Endpoints
+## PTZ REST-API
 
 Der REST-Server läuft standardmäßig auf Port 8080:
 
@@ -175,7 +197,7 @@ Response:
 curl http://localhost:8080/ptz/home
 ```
 
-## Verwendung
+## PTZ Verwendung
 
 ### Starten mit PTZ-Steuerung
 
@@ -209,16 +231,7 @@ http://localhost:8080/ptz/enable
 
 Im Display wechselt der Status zu **`PTZ: ON`** (grün).
 
-### PTZ-Status im Display
-
-Oben links im Visualizer wird der PTZ-Status angezeigt:
-
-```
-PTZ: ON   (grün = aktiv)
-PTZ: OFF  (rot = deaktiviert)
-```
-
-## Funktionsweise
+## PTZ Funktionsweise
 
 ### 1. Person-Erkennung
 - YOLOv8 erkennt Person im Frame
@@ -258,7 +271,8 @@ requests.get(url, timeout=0.5)
 
 Die Kamera nutzt HTTP-basierte CGI-Befehle gemäß Panasonic Interface Specification.
 
-### Speed-basierte Steuerung (PTS) ⭐️ **VERWENDET**
+### Speed-basierte Steuerung (PTS) - VERWENDET
+
 ```
 GET /cgi-bin/aw_ptz?cmd=%23PTS{pan_speed}{tilt_speed}&res=1
 ```
@@ -289,37 +303,19 @@ curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23PTS5560&res=1"
 curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23PTS2050&res=1"
 ```
 
-### Absolute Positionierung (APC/ATC) - Nicht verwendet
-Für Preset-Recall geeignet, aber nicht für smooth Tracking:
-```
-GET /cgi-bin/aw_ptz?cmd=%23APC{pan}ATC{tilt}&res=1
-```
-
-- **{pan}**: 00000-0FFFF (5-stellig Hex), Mitte = 08000
-- **{tilt}**: 00000-0FFFF (5-stellig Hex), Mitte = 08000
-
-Beispiele:
-```bash
-# Kamera zur Mitte fahren
-curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23APC08000ATC08000&res=1"
-
-# Kamera nach rechts oben
-curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23APC0A000ATC06000&res=1"
-```
-
-## Performance
+## PTZ Performance
 
 ### Mit GStreamer (EMPFOHLEN)
 - **Update-Rate**: 7.7 Hz (alle 130ms, Minimum laut Panasonic Spec)
 - **Video-Latenz**: 30-50ms (DeckLink SDI)
 - **End-to-End Latenz**: ~60-80ms (Video + Detection + PTZ)
-- **Reaktionszeit**: ⚡ **Hervorragend** für schnelle Bewegungen
+- **Reaktionszeit**: Hervorragend für schnelle Bewegungen
 
 ### Mit FFmpeg (Fallback)
 - **Update-Rate**: 7.7 Hz (alle 130ms)
 - **Video-Latenz**: 100-200ms
 - **End-to-End Latenz**: ~180-250ms (Video + Detection + PTZ)
-- **Reaktionszeit**: 🐢 **Ausreichend** für langsame Bewegungen
+- **Reaktionszeit**: Ausreichend für langsame Bewegungen
 
 ### Allgemeine Parameter
 - **Minimale Bewegung**: 10 Pan/Tilt Units (vermeidet Jitter)
@@ -327,7 +323,7 @@ curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23APC0A000ATC06000&res=1"
 - **Timeout**: 500ms pro HTTP-Request
 - **Command Delay**: 130ms Mindest-Abstand zwischen Befehlen (Panasonic-Vorgabe)
 
-## Troubleshooting
+## PTZ Troubleshooting
 
 ### Kamera nicht erreichbar
 
@@ -355,7 +351,7 @@ PTZ_MAX_SPEED = 15         # Reduzierte Max-Speed
 
 **Symptom**: Kamera folgt Person zu langsam oder reagiert verzögert
 
-**Lösung 1: GStreamer verwenden** (⚡ Beste Lösung)
+**Lösung 1: GStreamer verwenden** (Beste Lösung)
 ```python
 # src/config.py
 VIDEO_SOURCE = "gstreamer"  # 70% niedrigere Latenz!
@@ -434,31 +430,6 @@ Bitfocus Companion kann HTTP GET Requests senden:
 3. URL: `http://192.168.1.10:8080/ptz/toggle`
 4. Method: GET
 
-## Erweiterte Konfiguration
-
-### Mehrere Kameras
-
-Für mehrere Kameras separate PTZ-Controller instanziieren:
-
-```python
-# In custom code (nicht standardmäßig)
-camera1 = PTZController(camera_ip="192.168.1.100")
-camera2 = PTZController(camera_ip="192.168.1.101")
-```
-
-### Custom Tracking-Logik
-
-Für spezielle Anforderungen kann die `calculate_target_position()` Methode angepasst werden:
-
-```python
-# In src/ptz/ptz_controller.py
-def calculate_target_position(self, detection, frame_width, frame_height):
-    # Custom logic hier
-    # z.B. Person immer links statt zentriert
-    target_x = 0.33  # Linkes Drittel statt Mitte
-    ...
-```
-
 ## Sicherheit
 
 **Wichtig**: Der REST-Server hat keine Authentifizierung!
@@ -468,6 +439,250 @@ Für Produktionsumgebungen:
 2. Reverse-Proxy mit Basic Auth (nginx)
 3. VPN für Fernzugriff
 
-## Lizenz
+---
 
-Teil des PTZ-Tracking Projekts (siehe Haupt-README)
+# Multi-Person Tracking
+
+## Multi-Person Übersicht
+
+Das Multi-Person-Tracking-System trackt alle erkannten Personen mit persistenten IDs und erlaubt manuelle Auswahl der zu verfolgenden Person für PTZ-Steuerung.
+
+## Multi-Person Features
+
+- **Alle Personen tracken** - Jede Person erhält eine eindeutige Track-ID
+- **Persistente IDs** - IDs bleiben über Frames hinweg erhalten
+- **Manuelle Auswahl** - Wähle welche Person verfolgt werden soll
+- **Loop-Funktion** - Durchschalten zwischen allen Personen
+- **REST-API** - Fernsteuerung per HTTP-Endpoints
+- **Visuelle Unterscheidung** - Aktive Person wird hervorgehoben
+
+## Multi-Person Konfiguration
+
+In `src/config.py`:
+
+```python
+# Multi-Person-Tracking aktivieren
+ENABLE_MULTI_PERSON_TRACKING = True
+
+# Maximale Distanz für Track-Zuordnung (Pixel)
+MULTI_PERSON_MAX_DISTANCE = 150
+
+# Alle Personen mit IDs anzeigen
+SHOW_ALL_TRACKED_PERSONS = True
+
+# Farben
+INACTIVE_PERSON_COLOR = (100, 100, 100)  # Grau
+ACTIVE_PERSON_COLOR = (0, 255, 0)        # Grün
+```
+
+## Multi-Person Verwendung
+
+### 1. Über die Applikation
+
+Starte die Anwendung normal:
+
+```bash
+python src/main.py
+```
+
+**Tastenkombinationen:**
+- `n` - Zur nächsten Person wechseln (loop)
+- `q` - Beenden
+- `Space` - Pause/Resume
+- `r` - Tracker zurücksetzen
+- `f` - Vollbild-Toggle
+
+### 2. Über REST-API
+
+Die REST-API läuft standardmäßig auf `http://localhost:8090`
+
+#### Zur nächsten Person wechseln
+
+```bash
+curl http://localhost:8090/tracking/next
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Gewechselt zu Person 2",
+  "active_track_id": 2
+}
+```
+
+#### Spezifische Person auswählen
+
+```bash
+curl "http://localhost:8090/tracking/select?id=1"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Person 1 ausgewählt",
+  "active_track_id": 1
+}
+```
+
+#### Status aller getracken Personen
+
+```bash
+curl http://localhost:8090/tracking/status
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "tracking": {
+    "total_tracks": 3,
+    "active_track_id": 1,
+    "tracks": [
+      {
+        "track_id": 1,
+        "bbox": [100, 200, 400, 600],
+        "center": [250, 400],
+        "confidence": 0.92,
+        "area": 120000,
+        "frames_tracked": 145,
+        "velocity": 2.3,
+        "is_active": true
+      },
+      {
+        "track_id": 2,
+        "bbox": [500, 150, 700, 550],
+        "center": [600, 350],
+        "confidence": 0.88,
+        "area": 80000,
+        "frames_tracked": 98,
+        "velocity": 1.1,
+        "is_active": true
+      }
+    ]
+  }
+}
+```
+
+## Multi-Person REST-API
+
+### 3. Integration mit Bitfocus Companion
+
+Die REST-Endpoints können direkt in Companion-Buttons eingebunden werden:
+
+**Button 1: Nächste Person**
+- **Action:** HTTP Request
+- **Method:** GET
+- **URL:** `http://10.1.3.43:8090/tracking/next`
+
+**Button 2: Person 1**
+- **Action:** HTTP Request
+- **Method:** GET
+- **URL:** `http://10.1.3.43:8090/tracking/select?id=1`
+
+**Button 3: Person 2**
+- **Action:** HTTP Request
+- **Method:** GET
+- **URL:** `http://10.1.3.43:8090/tracking/select?id=2`
+
+## Technische Details
+
+### Track-ID-Vergabe
+
+- Jede neue Person erhält eine aufsteigende ID (1, 2, 3, ...)
+- IDs werden über Frames hinweg beibehalten (basierend auf Position)
+- Wenn eine Person das Bild verlässt (> 30 Frames unsichtbar), wird ihre ID freigegeben
+
+### Matching-Algorithmus
+
+Der einfache Matching-Algorithmus funktioniert wie folgt:
+
+1. **Distanz-basiertes Matching:** Berechne euklidische Distanz zwischen Track-Zentrum und Detection-Zentrum
+2. **Schwellwert:** Nur Matches unter `MULTI_PERSON_MAX_DISTANCE` (Standard: 150px)
+3. **Nearest Neighbor:** Jeder Track wird der nächstgelegenen Detection zugeordnet
+4. **Neue Tracks:** Unmatched Detections werden als neue Personen erkannt
+
+### Aktive Person
+
+- **Auto-Select:** Bei Start wird automatisch die größte Person gewählt
+- **Manuelle Auswahl:** Per API oder Tastendruck (`n`)
+- **Persistenz:** Aktive Person bleibt aktiv, auch wenn sie kurz verschwindet
+- **Fallback:** Wenn aktive Person verschwindet (> 30 Frames), wird automatisch größte Person gewählt
+
+### Visualisierung
+
+- **Grüne Box:** Aktive Person (wird von PTZ verfolgt)
+- **Graue Boxen:** Alle anderen getracken Personen
+- **Label:** Track-ID wird über jeder Box angezeigt
+- **[ACTIVE]:** Markierung für aktive Person
+
+## Beispielcode
+
+Siehe `examples/multi_person_tracking_example.py` für ein vollständiges Beispiel.
+
+```python
+from src.tracking.multi_person_tracker import MultiPersonTracker
+
+# Tracker erstellen
+tracker = MultiPersonTracker(
+    max_distance_threshold=150,
+    smoothing_enabled=True,
+    smoothing_factor=0.3
+)
+
+# Tracking aktualisieren
+detections = detector.detect(frame)
+active_detection = tracker.update(detections, frame.shape)
+
+# Zur nächsten Person wechseln
+new_id = tracker.select_next_person()
+
+# Spezifische Person auswählen
+success = tracker.select_person_by_id(2)
+
+# Status aller Tracks
+status = tracker.get_status()
+```
+
+## Multi-Person Troubleshooting
+
+### Personen werden nicht erkannt
+
+- Überprüfe `CONFIDENCE_THRESHOLD` in config.py
+- Erhöhe `MULTI_PERSON_MAX_DISTANCE` wenn Personen sich schnell bewegen
+
+### IDs springen/wechseln häufig
+
+- Erhöhe `MULTI_PERSON_MAX_DISTANCE` für besseres Matching
+- Reduziere `MAX_FRAMES_WITHOUT_DETECTION` um Tracks länger zu halten
+
+### REST-API antwortet nicht
+
+- Überprüfe ob REST-Server gestartet ist (log-Ausgabe)
+- Prüfe Port-Verfügbarkeit: `lsof -i :8090`
+- Firewall-Einstellungen überprüfen
+
+## Migration von Single-Person-Tracking
+
+Um von Single-Person- auf Multi-Person-Tracking umzustellen:
+
+1. **Config anpassen:**
+   ```python
+   ENABLE_MULTI_PERSON_TRACKING = True
+   ```
+
+2. **Anwendung neu starten**
+
+Das war's! Die Anwendung verwendet automatisch den MultiPersonTracker.
+
+Um zurückzuwechseln:
+```python
+ENABLE_MULTI_PERSON_TRACKING = False
+```
+
+## Performance
+
+- **CPU-Impact:** ~5-10% höher als Single-Person-Tracking
+- **Memory:** Pro getrackter Person ~1-2 KB
+- **Empfohlen:** Max. 5-10 gleichzeitige Personen für beste Performance

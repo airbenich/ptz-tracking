@@ -167,7 +167,7 @@ sudo apt update
 sudo apt install ffmpeg
 ```
 
-**GStreamer-Migration Guide:** [GSTREAMER_QUICKSTART.md](GSTREAMER_QUICKSTART.md)
+**GStreamer-Dokumentation:** [docs/GSTREAMER.md](docs/GSTREAMER.md)
 
 ### 4. Python-Dependencies installieren
 
@@ -398,7 +398,7 @@ curl http://localhost:8090/ptz/enable
 python test_ptz.py
 ```
 
-**Vollständige PTZ-Dokumentation:** [docs/PTZ_CONTROL.md](docs/PTZ_CONTROL.md)
+**Vollständige Feature-Dokumentation:** [docs/FEATURES.md](docs/FEATURES.md)
 
 ## Video-Input Setup
 
@@ -459,9 +459,8 @@ ffmpeg -f avfoundation -i "Cam Link" -pix_fmt bgr24 -f rawvideo -
 **Hinweis:** Unter Linux verwende `-f v4l2` statt `-f avfoundation`.
 
 **Vollständige Dokumentation:**
-- [GSTREAMER_QUICKSTART.md](GSTREAMER_QUICKSTART.md) - Schnellstart-Guide
-- [docs/GSTREAMER_MIGRATION.md](docs/GSTREAMER_MIGRATION.md) - Migrations-Dokumentation
-- [docs/PIPELINE_COMPARISON.md](docs/PIPELINE_COMPARISON.md) - FFmpeg vs. GStreamer Vergleich
+- [docs/GSTREAMER.md](docs/GSTREAMER.md) - GStreamer-Integration (Quick Start, Migration, Performance)
+- [docs/FEATURES.md](docs/FEATURES.md) - PTZ-Steuerung & Multi-Person-Tracking
 
 ## Projektstruktur
 
@@ -486,16 +485,13 @@ ptz-tracking/
 │   ├── logrotate/          # Log-Rotation
 │   └── scripts/            # Installations-Scripts
 ├── docs/                    # Dokumentation
-│   ├── GSTREAMER_MIGRATION.md    # GStreamer-Migration Guide
-│   ├── PIPELINE_COMPARISON.md    # FFmpeg vs. GStreamer
-│   ├── PTZ_CONTROL.md            # PTZ-Steuerung
-│   └── MULTI_PERSON_TRACKING.md  # Multi-Person-Tracking
+│   ├── GSTREAMER.md             # GStreamer-Dokumentation
+│   └── FEATURES.md               # PTZ & Multi-Person-Tracking
 ├── examples/               # Beispiel-Code
 ├── tests/                  # Unit Tests
 ├── models/                 # YOLO-Modelle
 ├── install-gstreamer.sh    # GStreamer-Installation
 ├── requirements.txt        # Python-Dependencies
-├── GSTREAMER_QUICKSTART.md # GStreamer Schnellstart
 └── README.md              # Diese Datei
 ```
 

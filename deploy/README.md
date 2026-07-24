@@ -289,10 +289,24 @@ sudo nano /usr/local/opt/ptz-tracking/src/config.py
 ```
 
 Wichtige Einstellungen:
-- `VIDEO_SOURCE`: "ffmpeg", "webcam", "file"
-- `FFMPEG_INPUT_DEVICE`: Device-Name
+- `VIDEO_SOURCE`: "gstreamer" (empfohlen), "ffmpeg", "webcam", "file"
+- `GSTREAMER_INPUT_DEVICE`: "Blackmagic", "Elgato", "Webcam" (bei GStreamer)
+- `FFMPEG_INPUT_DEVICE`: Device-Name (bei FFmpeg)
 - `HEADLESS_MODE`: Muss `True` sein für Service
 - `LOG_TO_FILE`: Empfohlen: `True`
+
+### Video-Backend Empfehlung
+
+**GStreamer (EMPFOHLEN):**
+- 30-50ms Latenz (vs. 100-200ms bei FFmpeg)
+- Native DeckLink-Integration
+- Bessere Performance
+- Installation: `./install-gstreamer.sh`
+
+**FFmpeg (Fallback):**
+- Funktioniert zuverlässig
+- Keine zusätzliche Installation nötig
+- Höhere Latenz
 
 Nach Änderungen Service neu starten.
 

@@ -50,8 +50,19 @@ cp -r models "$INSTALL_DIR/"
 cp requirements.txt "$INSTALL_DIR/"
 echo -e "${GREEN}✓ Dateien kopiert${NC}"
 
-# Schritt 4: Virtual Environment erstellen
-echo -e "\n${YELLOW}[4/7] Erstelle Virtual Environment...${NC}"
+# Schritt 4: GStreamer-Check (optional aber empfohlen)
+echo -e "\n${YELLOW}[4/8] Prüfe GStreamer-Installation...${NC}"
+if command -v gst-launch-1.0 &> /dev/null; then
+    echo -e "${GREEN}✓ GStreamer bereits installiert${NC}"
+else
+    echo -e "${YELLOW}⚠️  GStreamer nicht gefunden${NC}"
+    echo -e "${YELLOW}GStreamer wird für optimale Performance empfohlen (70% niedrigere Latenz)${NC}"
+    echo -e "${YELLOW}Installation: ./install-gstreamer.sh im Projekt-Root${NC}"
+    echo -e "${YELLOW}Alternativ: brew install gstreamer gst-python gst-plugins-base gst-plugins-good${NC}"
+fi
+
+# Schritt 5: Virtual Environment erstellen
+echo -e "\n${YELLOW}[5/8] Erstelle Virtual Environment...${NC}"
 cd "$INSTALL_DIR"
 python3 -m venv venv
 source venv/bin/activate
@@ -60,22 +71,22 @@ pip install -r requirements.txt
 deactivate
 echo -e "${GREEN}✓ Virtual Environment erstellt${NC}"
 
-# Schritt 5: Verzeichnisse für Logs und Output
-echo -e "\n${YELLOW}[5/7] Erstelle Log-Verzeichnisse...${NC}"
+# Schritt 6: Verzeichnisse für Logs und Output
+echo -e "\n${YELLOW}[6/8] Erstelle Log-Verzeichnisse...${NC}"
 mkdir -p "$INSTALL_DIR/logs"
 mkdir -p "$INSTALL_DIR/output"
 echo -e "${GREEN}✓ Verzeichnisse erstellt${NC}"
 
-# Schritt 6: Berechtigungen setzen
-echo -e "\n${YELLOW}[6/7] Setze Berechtigungen...${NC}"
+# Schritt 7: Berechtigungen setzen
+echo -e "\n${YELLOW}[7/8] Setze Berechtigungen...${NC}"
 chown -R "$(logname):staff" "$INSTALL_DIR"
 chmod -R 755 "$INSTALL_DIR"
 chmod -R 777 "$INSTALL_DIR/logs"
 chmod -R 777 "$INSTALL_DIR/output"
 echo -e "${GREEN}✓ Berechtigungen gesetzt${NC}"
 
-# Schritt 7: launchd Service installieren
-echo -e "\n${YELLOW}[7/7] Installiere launchd Service...${NC}"
+# Schritt 8: launchd Service installieren
+echo -e "\n${YELLOW}[8/8] Installiere launchd Service...${NC}"
 
 # plist anpassen (User ersetzen)
 CURRENT_USER=$(logname)
@@ -93,11 +104,13 @@ echo -e "${GREEN}Installation abgeschlossen!${NC}"
 echo -e "${GREEN}========================================${NC}\n"
 
 echo -e "Nächste Schritte:"
-echo -e "  ${YELLOW}1.${NC} Konfiguration anpassen: $INSTALL_DIR/src/config.py"
-echo -e "  ${YELLOW}2.${NC} Service laden: sudo launchctl load /Library/LaunchDaemons/$SERVICE_NAME.plist"
-echo -e "  ${YELLOW}3.${NC} Service starten: sudo launchctl start $SERVICE_NAME"
-echo -e "  ${YELLOW}4.${NC} Status prüfen: sudo launchctl list | grep ptztracking"
-echo -e "  ${YELLOW}5.${NC} Logs anzeigen: tail -f $INSTALL_DIR/logs/stdout.log\n"
+echo -e "  ${YELLOW}1.${NC} GStreamer installieren (EMPFOHLEN): ./install-gstreamer.sh"
+echo -e "  ${YELLOW}2.${NC} Konfiguration anpassen: $INSTALL_DIR/src/config.py"
+echo -e "       → VIDEO_SOURCE = 'gstreamer' (empfohlen) oder 'ffmpeg'"
+echo -e "  ${YELLOW}3.${NC} Service laden: sudo launchctl load /Library/LaunchDaemons/$SERVICE_NAME.plist"
+echo -e "  ${YELLOW}4.${NC} Service starten: sudo launchctl start $SERVICE_NAME"
+echo -e "  ${YELLOW}5.${NC} Status prüfen: sudo launchctl list | grep ptztracking"
+echo -e "  ${YELLOW}6.${NC} Logs anzeigen: tail -f $INSTALL_DIR/logs/stdout.log\n"
 
 echo -e "${YELLOW}Service beenden:${NC}"
 echo -e "  sudo launchctl stop $SERVICE_NAME"
