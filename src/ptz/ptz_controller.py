@@ -95,11 +95,13 @@ class PTZController:
             self._update_companion_status()
     
     def disable(self):
-        """Deaktiviert PTZ-Steuerung"""
+        """Deaktiviert PTZ-Steuerung und stoppt Kamera-Bewegung"""
         with self.lock:
             self.enabled = False
             logger.info("✗ PTZ-Steuerung deaktiviert")
             self._update_companion_status()
+        # Kamera stoppen (außerhalb des Locks um Deadlock zu vermeiden)
+        self._send_stop_command()
     
     def is_enabled(self) -> bool:
         """Gibt aktuellen Status zurück"""
@@ -113,7 +115,11 @@ class PTZController:
             status = "aktiviert" if self.enabled else "deaktiviert"
             logger.info(f"⇄ PTZ-Steuerung {status}")
             self._update_companion_status()
-            return self.enabled
+            new_status = self.enabled
+        # Kamera stoppen wenn deaktiviert (außerhalb des Locks)
+        if not new_status:
+            self._send_stop_command()
+        return new_status
     
     def calculate_target_speed(
         self,
