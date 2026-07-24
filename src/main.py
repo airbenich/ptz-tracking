@@ -28,6 +28,8 @@ def parse_arguments():
         epilog="""
 Beispiele:
   %(prog)s                          # Standard-Modus mit Konfiguration aus config.py
+  %(prog)s --source gstreamer --device Blackmagic  # GStreamer mit DeckLink (EMPFOHLEN)
+  %(prog)s --source ffmpeg          # FFmpeg-Input (Fallback)
   %(prog)s --source webcam          # Webcam-Input für Development
   %(prog)s --source file --file video.mp4   # Video-Datei verarbeiten
   %(prog)s --daemon                 # Als Service/Daemon laufen
@@ -39,7 +41,7 @@ Beispiele:
     # Video-Source
     parser.add_argument(
         '--source',
-        choices=['ffmpeg', 'webcam', 'file'],
+        choices=['gstreamer', 'ffmpeg', 'webcam', 'file'],
         default=config.VIDEO_SOURCE,
         help='Video-Quelle (default: %(default)s)'
     )
@@ -47,8 +49,8 @@ Beispiele:
     parser.add_argument(
         '--device',
         choices=['Blackmagic', 'Elgato', 'Webcam'],
-        default=config.FFMPEG_INPUT_DEVICE,
-        help='ffmpeg Input-Device (default: %(default)s)'
+        default=getattr(config, 'GSTREAMER_INPUT_DEVICE', config.FFMPEG_INPUT_DEVICE),
+        help='Input-Device (default: %(default)s)'
     )
     
     parser.add_argument(
@@ -150,6 +152,10 @@ def apply_cli_args(args):
     # Video-Source
     config.VIDEO_SOURCE = args.source
     config.FFMPEG_INPUT_DEVICE = args.device
+    
+    # GStreamer Input-Device (falls vorhanden)
+    if hasattr(config, 'GSTREAMER_INPUT_DEVICE'):
+        config.GSTREAMER_INPUT_DEVICE = args.device
     
     if args.file:
         config.VIDEO_FILE_PATH = args.file

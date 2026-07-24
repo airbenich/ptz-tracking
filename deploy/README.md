@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis enthält alle Dateien für die Installation und Verwaltung von PTZ Tracking als System-Service.
 
-## 📁 Verzeichnisstruktur
+## Verzeichnisstruktur
 
 ```
 deploy/
@@ -22,7 +22,7 @@ deploy/
 └── README.md                   # Diese Datei
 ```
 
-## 🚀 Installation
+## Installation
 
 ### Linux (systemd)
 
@@ -62,7 +62,7 @@ sudo launchctl list | grep ptztracking
 
 **Installationspfad:** `/usr/local/opt/ptz-tracking`
 
-## 🛠️ Service-Verwaltung
+## Service-Verwaltung
 
 ### Mit Service-Manager (empfohlen)
 
@@ -137,13 +137,13 @@ sudo launchctl load /Library/LaunchDaemons/com.ptztracking.service.plist
 sudo launchctl unload /Library/LaunchDaemons/com.ptztracking.service.plist
 ```
 
-## 🔍 Health-Checks
+## Health-Checks
 
 Das Health-Check Script prüft:
-- ✅ Ob der Prozess läuft
-- ✅ Ob Log-Dateien aktualisiert werden
-- ✅ Fehlerrate in Logs
-- ✅ Verfügbarer Disk-Space
+- Ob der Prozess läuft
+- Ob Log-Dateien aktualisiert werden
+- Fehlerrate in Logs
+- Verfügbarer Disk-Space
 
 ```bash
 # Manuell ausführen
@@ -192,7 +192,7 @@ Erstelle `/Library/LaunchDaemons/com.ptztracking.healthcheck.plist`:
 </plist>
 ```
 
-## 📝 Log-Management
+## Log-Management
 
 ### Linux (logrotate)
 
@@ -227,7 +227,7 @@ gzip *.log.1 2>/dev/null || true
 find . -name "*.log.gz" -mtime +30 -delete
 ```
 
-## 🗑️ Deinstallation
+## Deinstallation
 
 ### Linux
 
@@ -241,7 +241,7 @@ sudo ./deploy/scripts/uninstall-linux.sh
 sudo ./deploy/scripts/uninstall-macos.sh
 ```
 
-## ⚙️ Konfiguration
+## Konfiguration
 
 ### Service-Konfiguration
 
@@ -296,7 +296,7 @@ Wichtige Einstellungen:
 
 Nach Änderungen Service neu starten.
 
-## 🔒 Sicherheit
+## Sicherheit
 
 ### Berechtigungen
 
@@ -312,7 +312,7 @@ Die Service-Datei enthält Security-Features:
 - `ProtectSystem=strict`: Read-Only System-Verzeichnisse
 - `ProtectHome=true`: Kein Zugriff auf Home-Verzeichnisse
 
-## 📊 Monitoring
+## Monitoring
 
 ### Systemd Journal (Linux)
 
@@ -340,7 +340,7 @@ tail -100 /opt/ptz-tracking/logs/*.log | grep ERROR
 grep "FPS:" /opt/ptz-tracking/logs/*.log | tail -20
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Service startet nicht
 
@@ -385,7 +385,7 @@ ffmpeg -f v4l2 -list_devices true -i ""          # Linux
 # Systemeinstellungen → Datenschutz & Sicherheit → Kamera
 ```
 
-## 📚 Weitere Ressourcen
+## Weitere Ressourcen
 
 - [systemd Documentation](https://www.freedesktop.org/software/systemd/man/)
 - [launchd Documentation](https://www.launchd.info/)

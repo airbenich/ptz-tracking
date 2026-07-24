@@ -22,7 +22,7 @@ Eine Python-Anwendung zum Echtzeit-Tracking von Personen in Videostreams. Die An
    - Tracking der nächsten/prominentesten Person im Bild
    - Bounding Box um erkannte Person
    - Kontinuierliches Tracking über mehrere Frames
-   - **Pose-Estimation & Skeleton-Tracking** 🦴 NEU
+   - **Pose-Estimation & Skeleton-Tracking** (NEU)
      - 17 COCO-Keypoints (Körpergelenke)
      - Skeleton-Visualisierung mit Verbindungslinien
      - Konfidenz-basierte Keypoint-Filterung
@@ -31,7 +31,7 @@ Eine Python-Anwendung zum Echtzeit-Tracking von Personen in Videostreams. Die An
 3. **Ausgabe**
    - Live-Anzeige des Videostreams
    - Visualisierung der Tracking-Bounding-Box
-   - **Pose-Overlay (Keypoints + Skeleton)** 🦴 NEU
+   - **Pose-Overlay (Keypoints + Skeleton)** (NEU)
    - Anzeige von Tracking-Informationen (Position, Größe)
    - Optional: FPS-Counter
 

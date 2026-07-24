@@ -24,10 +24,14 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # Video-Input Konfiguration
 # ============================================================================
 
-# Video-Quelle: "ffmpeg", "webcam", "file"
-VIDEO_SOURCE = "ffmpeg"
+# Video-Quelle: "gstreamer", "ffmpeg", "webcam", "file"
+# EMPFOHLEN: "gstreamer" für bessere Performance und niedrigere Latenz
+VIDEO_SOURCE = "gstreamer"
 
-# ffmpeg Input-Device: "Blackmagic", "Elgato", "Webcam"
+# GStreamer Input-Device: "Blackmagic", "Elgato", "Webcam"
+GSTREAMER_INPUT_DEVICE = "Blackmagic"
+
+# ffmpeg Input-Device: "Blackmagic", "Elgato", "Webcam" (Legacy)
 FFMPEG_INPUT_DEVICE = "Blackmagic"
 
 # Video-Auflösung (Input)
@@ -57,7 +61,45 @@ FFMPEG_INPUT_FORMAT = "avfoundation"  # macOS: avfoundation, Linux: v4l2
 VIDEO_FILE_PATH = ""
 
 # ============================================================================
-# Person Detection (YOLO) Konfiguration
+# GStreamer Konfiguration (EMPFOHLEN für beste Performance)
+# ============================================================================
+
+# GStreamer Device-Nummern
+# Blackmagic DeckLink: 0, 1, 2, ... (für mehrere Cards)
+# V4L2 Linux: 0 = /dev/video0, 1 = /dev/video1, ...
+# AVFoundation macOS: 0, 1, 2, ... (automatisch erkannt)
+GSTREAMER_DEVICE_NUMBERS = {
+    "Blackmagic": 0,  # DeckLink Device-Nummer
+    "Elgato": 0,      # V4L2/AVFoundation Device-Index
+    "Webcam": 0,      # Standard Webcam Index
+}
+
+# DeckLink Verbindungstyp (nur für Blackmagic)
+# Optionen: "sdi", "hdmi", "optical-sdi", "component", "composite", "s-video"
+DECKLINK_CONNECTION = "sdi"
+
+# DeckLink Video-Modus (nur für Blackmagic)
+# Format: [resolution][progressive/interlaced][framerate]
+# Beispiele: "1080p25", "1080p50", "1080i50", "2160p30", "720p50"
+# WICHTIG: Muss mit FPS_TARGET übereinstimmen!
+DECKLINK_MODE = "1080p25"  # 1080p @ 25 FPS
+
+# GStreamer Buffer-Einstellungen
+# max-buffers: Maximale Anzahl gepufferter Frames (2 = niedrige Latenz)
+# drop: Alte Frames verwerfen wenn Buffer voll (true = Echtzeit-Priorität)
+GSTREAMER_MAX_BUFFERS = 2
+GSTREAMER_DROP_OLD_BUFFERS = True
+
+# Latenz-Kontrolle (Millisekunden)
+# Niedrigere Werte = bessere Reaktionszeit für PTZ-Tracking
+GSTREAMER_BUFFER_LATENCY = 0  # 0 = minimale Latenz
+
+# Hardware-Beschleunigung (GPU)
+# Automatische Auswahl der besten verfügbaren Methode
+GSTREAMER_HW_ACCELERATION = True
+
+# ============================================================================
+# FFmpeg Konfiguration (Legacy - für Fallback)
 # ============================================================================
 
 # YOLO-Modell: "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"

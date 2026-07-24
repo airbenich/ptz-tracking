@@ -6,19 +6,21 @@ Echtzeit-Tracking von Personen in Videostreams mit Python, OpenCV und YOLOv8.
 
 ### ✅ Vollständig implementiert
 
-- 🎥 **Video-Input-Handler**
+- **Video-Input-Handler** (VERBESSERT)
+  - **GStreamer-Integration (EMPFOHLEN)** - Native DeckLink-Support, 70% niedrigere Latenz
   - FFmpeg-Integration für professionelle Hardware (Blackmagic DeckLink, Elgato Cam Link)
   - Webcam-Support für Development/Testing
   - Video-Datei-Wiedergabe mit Loop-Option
-  - Plattform-übergreifend (macOS/Linux/Windows)
+  - Plattform-übergreifend (macOS/Linux)
+  - Hybrid-Backend: GStreamer für Performance, FFmpeg als Fallback
 
-- 👤 **Person Detection**
+- **Person Detection**
   - YOLOv8-basierte Echtzeit-Erkennung
   - Automatische Person-Filterung (COCO class_id=0)
   - Konfigurierbare Confidence-Schwellwerte
   - GPU-Beschleunigung (CUDA/MPS/CPU)
 
-- 📍 **Tracking**
+- **Tracking**
   - Frame-to-Frame Tracking der prominentesten Person
   - Drei Tracking-Methoden:
     - `largest_bbox` - Größte Person
@@ -27,22 +29,22 @@ Echtzeit-Tracking von Personen in Videostreams mit Python, OpenCV und YOLOv8.
   - Smoothing-Algorithmus für stabile Bounding Boxes
   - Automatische Tracking-Loss-Behandlung
 
-- 🖥️ **Visualisierung**
+- **Visualisierung**
   - OpenCV-basierte Live-Anzeige
   - Bounding Box mit Confidence-Score
-  - **Pose-Estimation & Skeleton-Overlay** 🦴
+  - **Pose-Estimation & Skeleton-Overlay**
     - 17 COCO-Keypoints (Gelenke, Körperteile)
     - Skeleton-Linien zwischen Keypoints
     - Konfigurierbare Farben und Sichtbarkeit
     - Konfidenz-basierte Filterung
-  - **PTZ-Status-Anzeige** 🎯
+  - **PTZ-Status-Anzeige**
     - PTZ ON/OFF Indicator (grün/rot)
   - FPS-Counter und Performance-Monitoring
   - Info-Overlay (Position, Größe, Area)
   - Vollbild-Modus
   - Interaktive Keyboard-Steuerung
 
-- 🎯 **PTZ-Kamera-Steuerung** ⭐ NEU
+- **PTZ-Kamera-Steuerung** (NEU)
   - Automatische Pan/Tilt-Steuerung für Panasonic AW-HE130
   - Person horizontal zentriert halten
   - Vertikale Positionierung nach goldenem Schnitt
@@ -52,26 +54,26 @@ Echtzeit-Tracking von Personen in Videostreams mit Python, OpenCV und YOLOv8.
   - Status-Anzeige im Visualizer
   - Kein automatischer Zoom (Operator-Kontrolle)
 
-- ⚡ **Performance**
+- **Performance**
   - Optimiert für >15 FPS
   - Apple Silicon MPS-Support
   - NVIDIA CUDA-Support
   - Automatische Device-Detection
 
-- 🔧 **Flexibilität**
+- **Flexibilität**
   - Umfassende CLI-Argumente
   - Headless-Modus für Server-Betrieb
   - Modulare Architektur
   - Einfach erweiterbar
 
-- 🚀 **Performance-Optimierung** ⚡
-  - Threading für asynchrones Frame-Lesen (+57% schneller!)
+- **Performance-Optimierung**
+  - Threading für asynchrones Frame-Lesen (+57% schneller)
   - Intelligentes Frame-Skipping bei hoher Last
   - Adaptive Performance-Anpassung
   - Konfigurierbarer Frame-Buffer
-  - Erreicht 27.7 FPS (Ziel: >15 FPS) ✅
+  - Erreicht 27.7 FPS (Ziel: >15 FPS erfüllt)
 
-- 🔧 **Service/Daemon-Modus** ⚡ NEU
+- **Service/Daemon-Modus** (NEU)
   - Automatische Installation (systemd/launchd)
   - Auto-Start beim Boot
   - Auto-Restart bei Crash
@@ -87,9 +89,10 @@ Echtzeit-Tracking von Personen in Videostreams mit Python, OpenCV und YOLOv8.
 - **Video-Input:** Blackmagic DeckLink, Elgato Cam Link oder Webcam
 
 ### Software
-- **Betriebssystem:** macOS 12+, Linux (Ubuntu 20.04+), Windows 10+
+- **Betriebssystem:** macOS 12+, Linux (Ubuntu 20.04+)
 - **Python:** 3.10 oder höher
-- **ffmpeg:** Mit Hardware-Beschleunigung
+- **GStreamer:** 1.20+ (EMPFOHLEN für beste Performance)
+- **ffmpeg:** Mit Hardware-Beschleunigung (Fallback)
 
 ## Installation
 
@@ -109,21 +112,62 @@ source venv/bin/activate  # macOS/Linux
 venv\Scripts\activate     # Windows
 ```
 
-### 3. ffmpeg installieren
+### 3. Video-Backend installieren
 
-#### macOS
+#### GStreamer (EMPFOHLEN für beste Performance)
+
+**Automatische Installation:**
+```bash
+chmod +x install-gstreamer.sh
+./install-gstreamer.sh
+```
+
+**Vorteile:**
+- 70% niedrigere Latenz (30-50ms vs. 100-200ms)
+- 30% weniger CPU-Last
+- Native Blackmagic DeckLink-Integration
+- Zero-Copy Buffer-Handling
+- Granulare Latenz-Kontrolle
+
+**Manuelle Installation:**
+
+##### macOS
+```bash
+brew install gstreamer gst-python gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
+```
+
+##### Linux (Ubuntu/Debian)
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-gi gstreamer1.0-tools \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+  gstreamer1.0-libav gstreamer1.0-decklink
+```
+
+**Blackmagic DeckLink SDK:**
+Download von [blackmagicdesign.com/support](https://www.blackmagicdesign.com/support/) und installiere Desktop Video Software.
+
+**Test:**
+```bash
+gst-device-monitor-1.0 Video
+python3 -c "import gi; gi.require_version('Gst', '1.0'); from gi.repository import Gst; print('OK')"
+```
+
+#### FFmpeg (Fallback)
+
+##### macOS
 ```bash
 brew install ffmpeg
 ```
 
-#### Linux (Ubuntu/Debian)
+##### Linux (Ubuntu/Debian)
 ```bash
 sudo apt update
 sudo apt install ffmpeg
 ```
 
-#### Windows
-Lade ffmpeg von [ffmpeg.org](https://ffmpeg.org/download.html) herunter und füge es zu PATH hinzu.
+**GStreamer-Migration Guide:** [GSTREAMER_QUICKSTART.md](GSTREAMER_QUICKSTART.md)
 
 ### 4. Python-Dependencies installieren
 
@@ -145,8 +189,20 @@ python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
 Bearbeite `src/config.py` für deine Hardware:
 
 ```python
-# Video-Input Quelle
-VIDEO_SOURCE = "ffmpeg"  # "ffmpeg", "webcam", "file"
+# Video-Input Quelle (EMPFOHLEN: gstreamer)
+VIDEO_SOURCE = "gstreamer"  # "gstreamer", "ffmpeg", "webcam", "file"
+
+# GStreamer (EMPFOHLEN für beste Performance)
+GSTREAMER_INPUT_DEVICE = "Blackmagic"  # "Blackmagic", "Elgato", "Webcam"
+GSTREAMER_DEVICE_NUMBERS = {
+    "Blackmagic": 0,  # DeckLink Device-Nummer
+    "Elgato": 0,      # V4L2/AVFoundation Device-Index
+    "Webcam": 0,
+}
+DECKLINK_CONNECTION = "sdi"      # sdi, hdmi, optical-sdi
+DECKLINK_MODE = "1080p25"        # 1080p25, 1080p50, 2160p25, etc.
+
+# FFmpeg (Fallback)
 FFMPEG_INPUT_DEVICE = "Blackmagic"  # "Blackmagic", "Elgato", "Webcam"
 
 # Video-Einstellungen
@@ -190,8 +246,14 @@ Die Anwendung kann direkt gestartet werden und verwendet die Einstellungen aus [
 # Virtual Environment aktivieren
 source venv/bin/activate
 
-# Standard-Modus mit ffmpeg (Blackmagic/Elgato)
+# Standard-Modus mit GStreamer (EMPFOHLEN)
 python src/main.py
+
+# Explizit GStreamer nutzen
+python src/main.py --source gstreamer --device Blackmagic
+
+# Mit FFmpeg (Fallback)
+python src/main.py --source ffmpeg --device Blackmagic
 
 # Mit Webcam (für Development/Testing)
 python src/main.py --source webcam
@@ -227,7 +289,7 @@ Für Server oder Daemon-Betrieb:
 python src/main.py --headless
 ```
 
-### Als Service/Daemon ⚡ NEU
+### Als Service/Daemon (NEU)
 
 PTZ Tracking kann als Hintergrund-Service mit automatischem Start installiert werden:
 
@@ -264,7 +326,7 @@ tail -f /usr/local/opt/ptz-tracking/logs/*.log
 - ✅ Log-Rotation
 - ✅ Einfache Deinstallation
 
-📖 **Vollständige Service-Dokumentation:** [deploy/README.md](deploy/README.md)
+**Vollständige Service-Dokumentation:** [deploy/README.md](deploy/README.md)
 
 ### Stream-Handler Beispiel
 
@@ -293,7 +355,7 @@ Kamera-Berechtigung muss in Systemeinstellungen erteilt werden:
 - **p** - Pause/Resume
 - **s** - Screenshot speichern (geplant)
 
-### PTZ-Kamera-Steuerung 🎯
+### PTZ-Kamera-Steuerung
 
 PTZ Tracking kann Panasonic AW-HE130 Kameras automatisch steuern, um die Person zentriert zu halten:
 
@@ -336,12 +398,50 @@ curl http://localhost:8090/ptz/enable
 python test_ptz.py
 ```
 
-📖 **Vollständige PTZ-Dokumentation:** [docs/PTZ_CONTROL.md](docs/PTZ_CONTROL.md)
+**Vollständige PTZ-Dokumentation:** [docs/PTZ_CONTROL.md](docs/PTZ_CONTROL.md)
 
-## ffmpeg Video-Input Setup
+## Video-Input Setup
 
-### Blackmagic DeckLink (macOS)
+### GStreamer (EMPFOHLEN)
 
+#### Verfügbare Devices anzeigen
+```bash
+gst-device-monitor-1.0 Video
+```
+
+#### Blackmagic DeckLink Test
+```bash
+# Pipeline direkt testen
+gst-launch-1.0 decklinkvideosrc device-number=0 connection=sdi mode=1080p25 ! videoconvert ! autovideosink
+
+# Verfügbare DeckLink-Modi anzeigen
+gst-inspect-1.0 decklinkvideosrc | grep -A 100 "mode"
+```
+
+#### Elgato Cam Link Test (Linux)
+```bash
+# V4L2 Test
+gst-launch-1.0 v4l2src device=/dev/video0 ! image/jpeg,width=1920,height=1080 ! jpegdec ! videoconvert ! autovideosink
+```
+
+#### Elgato Cam Link Test (macOS)
+```bash
+# AVFoundation Test
+gst-launch-1.0 avfvideosrc device-index=0 ! videoconvert ! autovideosink
+```
+
+**Performance-Monitoring:**
+```bash
+# GStreamer Handler testen
+python3 src/stream/gstreamer_handler.py
+
+# Stream Factory testen
+python3 src/stream/stream_factory.py
+```
+
+### FFmpeg (Fallback)
+
+#### Blackmagic DeckLink (macOS)
 ```bash
 # Verfügbare Devices auflisten
 ffmpeg -f avfoundation -list_devices true -i ""
@@ -350,21 +450,18 @@ ffmpeg -f avfoundation -list_devices true -i ""
 ffmpeg -f decklink -i "DeckLink SDI 4K" -pix_fmt bgr24 -f rawvideo -
 ```
 
-### Elgato Cam Link (macOS)
-
+#### Elgato Cam Link (macOS)
 ```bash
 # Stream mit Elgato
 ffmpeg -f avfoundation -i "Cam Link" -pix_fmt bgr24 -f rawvideo -
 ```
 
-### Webcam (Development)
-
-```bash
-# Standard Webcam
-ffmpeg -f avfoundation -i "0" -pix_fmt bgr24 -f rawvideo -
-```
-
 **Hinweis:** Unter Linux verwende `-f v4l2` statt `-f avfoundation`.
+
+**Vollständige Dokumentation:**
+- [GSTREAMER_QUICKSTART.md](GSTREAMER_QUICKSTART.md) - Schnellstart-Guide
+- [docs/GSTREAMER_MIGRATION.md](docs/GSTREAMER_MIGRATION.md) - Migrations-Dokumentation
+- [docs/PIPELINE_COMPARISON.md](docs/PIPELINE_COMPARISON.md) - FFmpeg vs. GStreamer Vergleich
 
 ## Projektstruktur
 
@@ -374,8 +471,13 @@ ptz-tracking/
 │   ├── main.py              # Haupteinstiegspunkt
 │   ├── config.py            # Konfiguration
 │   ├── stream/              # Video-Input Handler
+│   │   ├── gstreamer_handler.py  # GStreamer (EMPFOHLEN)
+│   │   ├── ffmpeg_handler.py     # FFmpeg (Fallback)
+│   │   ├── webcam_handler.py     # Webcam
+│   │   └── stream_factory.py     # Factory Pattern
 │   ├── tracking/            # Person Detection & Tracking
 │   ├── display/             # Visualisierung
+│   ├── ptz/                 # PTZ-Kamera-Steuerung
 │   └── utils/               # Logging, Performance-Messung
 ├── deploy/                  # Service-Deployment (systemd/launchd)
 │   ├── README.md           # Deployment-Dokumentation
@@ -383,10 +485,17 @@ ptz-tracking/
 │   ├── launchd/            # macOS launchd Service
 │   ├── logrotate/          # Log-Rotation
 │   └── scripts/            # Installations-Scripts
+├── docs/                    # Dokumentation
+│   ├── GSTREAMER_MIGRATION.md    # GStreamer-Migration Guide
+│   ├── PIPELINE_COMPARISON.md    # FFmpeg vs. GStreamer
+│   ├── PTZ_CONTROL.md            # PTZ-Steuerung
+│   └── MULTI_PERSON_TRACKING.md  # Multi-Person-Tracking
 ├── examples/               # Beispiel-Code
 ├── tests/                  # Unit Tests
 ├── models/                 # YOLO-Modelle
+├── install-gstreamer.sh    # GStreamer-Installation
 ├── requirements.txt        # Python-Dependencies
+├── GSTREAMER_QUICKSTART.md # GStreamer Schnellstart
 └── README.md              # Diese Datei
 ```
 

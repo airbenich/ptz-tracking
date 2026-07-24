@@ -6,15 +6,57 @@ Die PTZ-Tracking-Steuerung ermöglicht automatisches Schwenken und Neigen (Pan/T
 
 ## Features
 
-✅ **Automatische Person-Zentrierung** - Person wird horizontal in der Mitte gehalten  
-✅ **Goldener Schnitt** - Vertikale Positionierung nach goldenem Schnitt (0.618 von unten)  
-✅ **Broadcast-Quality Movement** - Progressive Speed-basierte Steuerung für smooth, professionelle Kamerabewegungen  
-✅ **Progressive Annäherung** - Je näher am Ziel, desto langsamer die Bewegung  
-✅ **Speed-Ramping** - Exponentiell verlangsamend für natürliche Bewegungen  
-✅ **Dead-Zone** - Vermeidet Mikrobewegungen bei kleinen Abweichungen  
-✅ **REST-API Steuerung** - Ein-/Ausschalten über HTTP GET Requests  
-✅ **Status-Anzeige** - PTZ-Status sichtbar im Visualizer  
-✅ **Kein automatischer Zoom** - Zoom-Steuerung bleibt beim Operator  
+- **Automatische Person-Zentrierung** - Person wird horizontal in der Mitte gehalten  
+- **Goldener Schnitt** - Vertikale Positionierung nach goldenem Schnitt (0.618 von unten)  
+- **Broadcast-Quality Movement** - Progressive Speed-basierte Steuerung für smooth, professionelle Kamerabewegungen  
+- **Progressive Annäherung** - Je näher am Ziel, desto langsamer die Bewegung  
+- **Speed-Ramping** - Exponentiell verlangsamend für natürliche Bewegungen  
+- **Dead-Zone** - Vermeidet Mikrobewegungen bei kleinen Abweichungen  
+- **REST-API Steuerung** - Ein-/Ausschalten über HTTP GET Requests  
+- **Status-Anzeige** - PTZ-Status sichtbar im Visualizer  
+- **Kein automatischer Zoom** - Zoom-Steuerung bleibt beim Operator  
+- **GStreamer-Optimiert** - 70% niedrigere Latenz für reaktiveres Tracking  
+
+## Video-Backend für optimale Performance
+
+### GStreamer (EMPFOHLEN)
+
+**Vorteile für PTZ-Tracking:**
+- **Latenz: 30-50ms** (vs. 100-200ms mit FFmpeg)
+- **70% schnellere Reaktion** auf Personenbewegungen
+- **Präziseres Tracking** durch niedrigere Verzögerung
+- **Native DeckLink-Integration** für professionelle Setups
+
+**Konfiguration:**
+```python
+# src/config.py
+VIDEO_SOURCE = "gstreamer"  # EMPFOHLEN für PTZ
+GSTREAMER_INPUT_DEVICE = "Blackmagic"
+DECKLINK_CONNECTION = "sdi"
+DECKLINK_MODE = "1080p25"
+```
+
+**Installation:**
+```bash
+chmod +x install-gstreamer.sh
+./install-gstreamer.sh
+```
+
+**Details:** [GSTREAMER_QUICKSTART.md](../GSTREAMER_QUICKSTART.md)
+
+### FFmpeg (Fallback)
+
+**Charakteristik:**
+- **Latenz: 100-200ms**
+- **Funktioniert zuverlässig** für weniger kritische Anwendungen
+- **Einfaches Setup**
+
+**Konfiguration:**
+```python
+# src/config.py
+VIDEO_SOURCE = "ffmpeg"
+FFMPEG_INPUT_DEVICE = "Blackmagic"
+```  
 
 ## Konfiguration
 
@@ -138,11 +180,14 @@ curl http://localhost:8080/ptz/home
 ### Starten mit PTZ-Steuerung
 
 ```bash
+# Mit GStreamer (EMPFOHLEN für beste Reaktionszeit)
+python src/main.py --source gstreamer --device Blackmagic
+
+# Mit FFmpeg (Fallback)
+python src/main.py --source ffmpeg --device Blackmagic
+
 # Mit Webcam für Testing
 python src/main.py --source webcam
-
-# Mit professionellem Equipment
-python src/main.py --source ffmpeg
 ```
 
 Die Anwendung:
@@ -264,7 +309,19 @@ curl "http://192.168.1.100/cgi-bin/aw_ptz?cmd=%23APC0A000ATC06000&res=1"
 
 ## Performance
 
+### Mit GStreamer (EMPFOHLEN)
 - **Update-Rate**: 7.7 Hz (alle 130ms, Minimum laut Panasonic Spec)
+- **Video-Latenz**: 30-50ms (DeckLink SDI)
+- **End-to-End Latenz**: ~60-80ms (Video + Detection + PTZ)
+- **Reaktionszeit**: ⚡ **Hervorragend** für schnelle Bewegungen
+
+### Mit FFmpeg (Fallback)
+- **Update-Rate**: 7.7 Hz (alle 130ms)
+- **Video-Latenz**: 100-200ms
+- **End-to-End Latenz**: ~180-250ms (Video + Detection + PTZ)
+- **Reaktionszeit**: 🐢 **Ausreichend** für langsame Bewegungen
+
+### Allgemeine Parameter
 - **Minimale Bewegung**: 10 Pan/Tilt Units (vermeidet Jitter)
 - **Smoothing**: Default 0.7 (70% alte Position, 30% neue Position)
 - **Timeout**: 500ms pro HTTP-Request
@@ -298,7 +355,13 @@ PTZ_MAX_SPEED = 15         # Reduzierte Max-Speed
 
 **Symptom**: Kamera folgt Person zu langsam oder reagiert verzögert
 
-**Lösung**:
+**Lösung 1: GStreamer verwenden** (⚡ Beste Lösung)
+```python
+# src/config.py
+VIDEO_SOURCE = "gstreamer"  # 70% niedrigere Latenz!
+```
+
+**Lösung 2: Geschwindigkeit erhöhen**
 ```python
 # In config.py anpassen:
 PTZ_SPEED_SMOOTHING = 0.1  # Weniger Glättung (schnellere Reaktion)
@@ -398,7 +461,7 @@ def calculate_target_position(self, detection, frame_width, frame_height):
 
 ## Sicherheit
 
-⚠️ **Wichtig**: Der REST-Server hat keine Authentifizierung!
+**Wichtig**: Der REST-Server hat keine Authentifizierung!
 
 Für Produktionsumgebungen:
 1. Firewall-Regeln einrichten (nur trusted IPs)

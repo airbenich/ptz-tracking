@@ -12,6 +12,14 @@ from src.stream.webcam_handler import WebcamHandler
 from src.stream.video_file_handler import VideoFileHandler
 from src.stream.ffmpeg_handler import FFmpegStreamHandler
 
+# GStreamer Handler (optional - falls installiert)
+try:
+    from src.stream.gstreamer_handler import GStreamerHandler, GST_AVAILABLE
+    GSTREAMER_ENABLED = GST_AVAILABLE
+except ImportError:
+    GSTREAMER_ENABLED = False
+    GStreamerHandler = None
+
 
 logger = get_logger(__name__)
 
@@ -24,7 +32,7 @@ def create_video_source(
     Factory-Funktion zum Erstellen der passenden Video-Quelle
     
     Args:
-        source_type: "webcam", "file", "ffmpeg" (oder None für config.VIDEO_SOURCE)
+        source_type: "gstreamer", "webcam", "file", "ffmpeg" (oder None für config.VIDEO_SOURCE)
         **kwargs: Zusätzliche Parameter für den Handler
     
     Returns:
@@ -36,6 +44,26 @@ def create_video_source(
     source_type = source_type or config.VIDEO_SOURCE
     
     logger.info(f"Erstelle Video-Quelle: {source_type}")
+    
+    if source_type == "gstreamer":
+        # GStreamer-Handler (EMPFOHLEN)
+        if not GSTREAMER_ENABLED:
+            logger.error("GStreamer ist nicht verfügbar!")
+            logger.error("Installation: macOS: brew install gstreamer gst-python gst-plugins-base gst-plugins-good gst-plugins-bad")
+            logger.error("Installation: Linux: apt-get install python3-gi gstreamer1.0-tools gstreamer1.0-plugins-*")
+            logger.warning("Fallback auf FFmpeg...")
+            source_type = "ffmpeg"
+        else:
+            device = kwargs.get('device') or config.GSTREAMER_INPUT_DEVICE
+            device_number = config.GSTREAMER_DEVICE_NUMBERS.get(device, 0)
+            
+            return GStreamerHandler(
+                device=device,
+                resolution=kwargs.get('resolution', config.RESOLUTION),
+                fps=kwargs.get('fps', config.FPS_TARGET),
+                device_number=device_number,
+                connection=kwargs.get('connection', config.DECKLINK_CONNECTION)
+            )
     
     if source_type == "webcam":
         # Webcam-Handler
@@ -59,7 +87,7 @@ def create_video_source(
         )
     
     elif source_type == "ffmpeg":
-        # FFmpeg-Handler
+        # FFmpeg-Handler (Legacy - Fallback)
         return FFmpegStreamHandler(
             device=kwargs.get('device'),
             resolution=kwargs.get('resolution'),
@@ -67,13 +95,24 @@ def create_video_source(
         )
     
     else:
-        raise ValueError(f"Ungültiger source_type: {source_type}. Erlaubt: webcam, file, ffmpeg")
+        raise ValueError(f"Ungültiger source_type: {source_type}. Erlaubt: gstreamer, webcam, file, ffmpeg")
 
 
 if __name__ == "__main__":
     # Test
     logger.info("Testing Stream Factory...")
     logger.info("=" * 60)
+    
+    # Test 0: GStreamer-Handler (EMPFOHLEN)
+    logger.info("\n0. GStreamer-Handler erstellen:")
+    if GSTREAMER_ENABLED:
+        try:
+            gstreamer = create_video_source("gstreamer", device="Blackmagic")
+            logger.info(f"✓ Erstellt: {gstreamer.__class__.__name__}")
+        except Exception as e:
+            logger.error(f"✗ Fehler: {e}")
+    else:
+        logger.warning("✗ GStreamer nicht verfügbar")
     
     # Test 1: Webcam
     logger.info("\n1. Webcam-Handler erstellen:")
@@ -91,13 +130,14 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"✗ Fehler: {e}")
     
-    # Test 3: FFmpeg
+    # Test 3: FFmpeg (Legacy)
     logger.info("\n3. FFmpeg-Handler erstellen:")
     try:
         ffmpeg = create_video_source("ffmpeg")
         logger.info(f"✓ Erstellt: {ffmpeg.__class__.__name__}")
     except Exception as e:
         logger.error(f"✗ Fehler: {e}")
+
     
     # Test 4: Aus Config
     logger.info(f"\n4. Handler aus Config erstellen (VIDEO_SOURCE={config.VIDEO_SOURCE}):")

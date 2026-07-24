@@ -1,5 +1,9 @@
 # PTZ Tracking - Python Dependencies
 
+# ==============================================================================
+# Core Dependencies
+# ==============================================================================
+
 # Deep Learning & Computer Vision
 opencv-python>=4.8.0          # OpenCV für Video-Verarbeitung und Display
 ultralytics>=8.0.0            # YOLOv8 für Person Detection
@@ -21,11 +25,55 @@ requests>=2.31.0              # HTTP-Requests für PTZ-Steuerung
 # System-Monitoring
 psutil>=5.9.0                 # System und Prozess-Statistiken
 
-# Video-Input (ffmpeg-python für Python-Wrapper)
+# ==============================================================================
+# Video-Input Dependencies
+# ==============================================================================
+
+# GStreamer (EMPFOHLEN für beste Performance und niedrige Latenz)
+# WICHTIG: GStreamer muss systemweit installiert werden
+# Installation siehe unten in "GStreamer Installation"
+PyGObject>=3.42.0             # Python Bindings für GStreamer (gi.repository)
+
+# FFmpeg (Legacy - Fallback wenn GStreamer nicht verfügbar)
 ffmpeg-python>=0.2.0          # ffmpeg Python-Interface (optional)
 
+# ==============================================================================
 # Development Dependencies (optional)
+# ==============================================================================
 # pytest>=7.4.0               # Testing
 # black>=23.0.0               # Code Formatting
 # flake8>=6.0.0               # Linting
 # mypy>=1.4.0                 # Type Checking
+
+# ==============================================================================
+# GStreamer Installation (systemweit - NICHT über pip)
+# ==============================================================================
+#
+# macOS (via Homebrew):
+#   brew install gstreamer gst-python gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
+#   
+#   Für Blackmagic DeckLink Support:
+#   1. Download Blackmagic Desktop Video SDK von https://www.blackmagicdesign.com/support/
+#   2. Installiere Desktop Video Driver
+#   3. decklinkvideosrc Plugin ist dann verfügbar
+#
+# Linux (Ubuntu/Debian):
+#   sudo apt-get update
+#   sudo apt-get install -y \
+#     python3-gi \
+#     gstreamer1.0-tools \
+#     gstreamer1.0-plugins-base \
+#     gstreamer1.0-plugins-good \
+#     gstreamer1.0-plugins-bad \
+#     gstreamer1.0-plugins-ugly \
+#     gstreamer1.0-libav
+#   
+#   Für Blackmagic DeckLink Support:
+#   sudo apt-get install gstreamer1.0-decklink
+#
+# Test der Installation:
+#   python3 -c "import gi; gi.require_version('Gst', '1.0'); from gi.repository import Gst; print('GStreamer OK')"
+#   gst-inspect-1.0 decklinkvideosrc
+#   gst-device-monitor-1.0 Video
+#
+# ==============================================================================

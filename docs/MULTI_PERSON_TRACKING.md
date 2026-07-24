@@ -6,12 +6,12 @@ Das Multi-Person-Tracking-System trackt alle erkannten Personen mit persistenten
 
 ## Features
 
-- ✅ **Alle Personen tracken** - Jede Person erhält eine eindeutige Track-ID
-- ✅ **Persistente IDs** - IDs bleiben über Frames hinweg erhalten
-- ✅ **Manuelle Auswahl** - Wähle welche Person verfolgt werden soll
-- ✅ **Loop-Funktion** - Durchschalten zwischen allen Personen
-- ✅ **REST-API** - Fernsteuerung per HTTP-Endpoints
-- ✅ **Visuelle Unterscheidung** - Aktive Person wird hervorgehoben
+- **Alle Personen tracken** - Jede Person erhält eine eindeutige Track-ID
+- **Persistente IDs** - IDs bleiben über Frames hinweg erhalten
+- **Manuelle Auswahl** - Wähle welche Person verfolgt werden soll
+- **Loop-Funktion** - Durchschalten zwischen allen Personen
+- **REST-API** - Fernsteuerung per HTTP-Endpoints
+- **Visuelle Unterscheidung** - Aktive Person wird hervorgehoben
 
 ## Konfiguration
 
